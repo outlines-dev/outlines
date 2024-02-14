@@ -5,10 +5,11 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
+from outlines.models.model import OutlinesModel
 from outlines.models.tokenizer import Tokenizer
 
 
-class LlamaCpp:
+class LlamaCpp(OutlinesModel):
     """Represents a `llama_cpp` model."""
 
     def __init__(

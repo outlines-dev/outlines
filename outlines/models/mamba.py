@@ -2,6 +2,8 @@ from typing import TYPE_CHECKING, Optional
 
 import torch
 
+from outlines.models.model import OutlinesModel
+
 from .transformers import TransformerTokenizer
 
 if TYPE_CHECKING:
@@ -12,7 +14,7 @@ if TYPE_CHECKING:
 TOKENIZER_MODEL = "EleutherAI/gpt-neox-20b"
 
 
-class Mamba:
+class Mamba(OutlinesModel):
     """Represent a `mamba` model."""
 
     def __init__(

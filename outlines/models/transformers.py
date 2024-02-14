@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import torch
 
+from outlines.models.model import OutlinesModel
 from outlines.models.tokenizer import Tokenizer
 
 if TYPE_CHECKING:
@@ -55,7 +56,7 @@ def get_llama_tokenizer_types():
     )
 
 
-class Transformer:
+class Transformer(OutlinesModel):
     """Represents a `transformers` model."""
 
     def __init__(

@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Callable, Iterator, List, Optional, Tuple
 import torch
 
 from outlines.fsm.fsm import FSMState
+from outlines.logging import log_logits
+from outlines.models.model import OutlinesModel
 
 if TYPE_CHECKING:
     from outlines.fsm.fsm import FSM
@@ -24,7 +26,7 @@ class GenerationState:
 
 
 def sequence_generator(
-    model: Callable,
+    model: OutlinesModel,
     sampler: Callable,
     fsms: List["FSM"],
     token_ids: torch.Tensor,
@@ -79,6 +81,8 @@ def sequence_generator(
         next_token_ids, ancestors, sequence_weights = sampler(
             biased_logits, sequence_weights, rng
         )
+
+        log_logits(model.tokenizer, token_ids, logits, biased_logits, next_token_ids)
 
         token_ids = update_token_ids(token_ids, next_token_ids, ancestors)
         attention_masks = update_attention_masks(attention_masks, ancestors)

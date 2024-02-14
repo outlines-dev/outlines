@@ -10,6 +10,7 @@ import numpy as np
 
 from outlines.base import vectorize
 from outlines.caching import cache
+from outlines.models.model import OutlinesModel
 
 __all__ = ["OpenAI", "openai"]
 
@@ -71,7 +72,7 @@ class OpenAIConfig:
     user: str = field(default_factory=str)
 
 
-class OpenAI:
+class OpenAI(OutlinesModel):
     """An object that represents the OpenAI API."""
 
     def __init__(
