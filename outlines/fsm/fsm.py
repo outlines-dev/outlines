@@ -1,3 +1,4 @@
+import functools
 from typing import TYPE_CHECKING, List, NewType, Protocol, Tuple
 
 import interegular
@@ -88,6 +89,7 @@ class StopAtEosFSM(FSM):
         return self
 
 
+@functools.lru_cache(maxsize=1024)
 class RegexFSM(FSM):
     """FSM to generate text that is in the language of a regular expression."""
 
