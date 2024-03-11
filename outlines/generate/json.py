@@ -18,6 +18,7 @@ def json(
     schema_object: Union[str, object, Callable],
     sampler: Sampler = multinomial(),
     whitespace_pattern: Optional[str] = None,
+    ignore_fields_order: bool = False,
 ) -> SequenceGenerator:
     """
     Generate structured JSON data with a `Transformer` model based on a specified JSON Schema.
@@ -36,7 +37,9 @@ def json(
     whitespace_pattern
         Pattern to use for JSON syntactic whitespace (doesn't impact string literals)
         Example: allow only a single space or newline with `whitespace_pattern=r"[\n ]?"`
-
+    ignore_fields_order
+        If True, the generated JSON will not be constrained by the order of the fields
+        in the schema.
     Returns
     -------
     A `SequenceGenerator` instance that generates text constrained by the schema_object and
@@ -45,17 +48,23 @@ def json(
     """
     if isinstance(schema_object, type(BaseModel)):
         schema = pyjson.dumps(schema_object.model_json_schema())
-        regex_str = build_regex_from_schema(schema, whitespace_pattern)
+        regex_str = build_regex_from_schema(
+            schema, whitespace_pattern, ignore_fields_order
+        )
         generator = regex(model, regex_str, sampler)
         generator.format_sequence = lambda x: schema_object.parse_raw(x)
     elif callable(schema_object):
         schema = pyjson.dumps(get_schema_from_signature(schema_object))
-        regex_str = build_regex_from_schema(schema, whitespace_pattern)
+        regex_str = build_regex_from_schema(
+            schema, whitespace_pattern, ignore_fields_order
+        )
         generator = regex(model, regex_str, sampler)
         generator.format_sequence = lambda x: pyjson.loads(x)
     elif isinstance(schema_object, str):
         schema = schema_object
-        regex_str = build_regex_from_schema(schema, whitespace_pattern)
+        regex_str = build_regex_from_schema(
+            schema, whitespace_pattern, ignore_fields_order
+        )
         generator = regex(model, regex_str, sampler)
         generator.format_sequence = lambda x: pyjson.loads(x)
     else:

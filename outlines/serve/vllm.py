@@ -114,7 +114,13 @@ class RegexLogitsProcessor:
 
 
 class JSONLogitsProcessor(RegexLogitsProcessor):
-    def __init__(self, schema: Dict, llm, whitespace_pattern: Optional[str] = None):
+    def __init__(
+        self,
+        schema: Dict,
+        llm,
+        whitespace_pattern: Optional[str] = None,
+        ignore_fields_order: bool = False,
+    ):
         """Compile the FSM that drives the JSON-guided generation.
 
         Parameters
@@ -126,6 +132,9 @@ class JSONLogitsProcessor(RegexLogitsProcessor):
         whitespace_pattern
             Pattern to use for JSON syntactic whitespace (doesn't impact string literals)
             Example: allow only a single space or newline with `whitespace_pattern=r"[\n ]?"`
+        ignore_fields_order
+            If True, the generated JSON will not be constrained by the order of the fields
+            in the schema.
         """
         if isinstance(schema, type(BaseModel)):
             schema_str = json.dumps(schema.model_json_schema())
@@ -139,5 +148,7 @@ class JSONLogitsProcessor(RegexLogitsProcessor):
                 + "a Pydantic object, a dictionary or a string that contains the JSON "
                 + "Schema specification"
             )
-        regex_string = build_regex_from_schema(schema_str, whitespace_pattern)
+        regex_string = build_regex_from_schema(
+            schema_str, whitespace_pattern, ignore_fields_order
+        )
         super().__init__(regex_string, llm)

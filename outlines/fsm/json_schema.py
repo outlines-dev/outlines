@@ -1,7 +1,8 @@
 import inspect
 import json
 import re
-from typing import Callable, Optional
+from itertools import permutations
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from jsonschema.protocols import Validator
 from pydantic import create_model
@@ -38,7 +39,11 @@ format_to_regex = {
 }
 
 
-def build_regex_from_schema(schema: str, whitespace_pattern: Optional[str] = None):
+def build_regex_from_schema(
+    schema: str,
+    whitespace_pattern: Optional[str] = None,
+    ignore_fields_order: bool = False,
+):
     """Turn a JSON schema into a regex that matches any JSON object that follows
     this schema.
 
@@ -57,7 +62,9 @@ def build_regex_from_schema(schema: str, whitespace_pattern: Optional[str] = Non
     whitespace_pattern
         Pattern to use for JSON syntactic whitespace (doesn't impact string literals)
         Example: allow only a single space or newline with `whitespace_pattern=r"[\n ]?"`
-
+    ignore_fields_order
+        If True, the generated JSON will not be constrained by the order of the fields
+        in the schema.
     Returns
     -------
     A generation schedule. A list of strings that represent the JSON
@@ -80,7 +87,7 @@ def build_regex_from_schema(schema: str, whitespace_pattern: Optional[str] = Non
     resolver = registry.resolver()
 
     content = schema.contents
-    return to_regex(resolver, content, whitespace_pattern)
+    return to_regex(resolver, content, whitespace_pattern, ignore_fields_order)
 
 
 def _get_num_items_pattern(min_items, max_items, whitespace_pattern):
@@ -95,8 +102,62 @@ def _get_num_items_pattern(min_items, max_items, whitespace_pattern):
         return rf"{{{max(min_items - 1, 0)},{max_items - 1}}}"
 
 
+def _to_regex_properties(
+    resolver: Resolver,
+    properties: Dict[str, Any],
+    required_properties: List[str],
+    perms: Iterable[int],
+    whitespace_pattern: Optional[str] = None,
+):
+    regex = ""
+    # Re-order properties according to the given permutation
+    properties_items = list(properties.items())
+    properties_items = [properties_items[i] for i in perms]
+    is_required = [name in required_properties for name, _ in properties_items]
+    # If at least one property is required, we include the one in the lastest position
+    # without any comma.
+    # For each property before it (optional or required), we add with a comma after the property.
+    # For each property after it (optional), we add with a comma before the property.
+    if any(is_required):
+        last_required_pos = max([i for i, value in enumerate(is_required) if value])
+        for i, (name, value) in enumerate(properties_items):
+            subregex = f'{whitespace_pattern}"{re.escape(name)}"{whitespace_pattern}:{whitespace_pattern}'
+            subregex += to_regex(resolver, value, whitespace_pattern)
+            if i < last_required_pos:
+                subregex = f"{subregex}{whitespace_pattern},"
+            elif i > last_required_pos:
+                subregex = f"{whitespace_pattern},{subregex}"
+            regex += subregex if is_required[i] else f"({subregex})?"
+    # If no property is required, we have to create a possible pattern for each property in which
+    # it's the last one necessarilly present. Then, we add the others as optional before and after
+    # following the same strategy as described above.
+    # The whole block is made optional to allow the case in which no property is returned.
+    else:
+        property_subregexes = []
+        for i, (name, value) in enumerate(properties_items):
+            subregex = (
+                f'{whitespace_pattern}"{name}"{whitespace_pattern}:{whitespace_pattern}'
+            )
+            subregex += to_regex(resolver, value, whitespace_pattern)
+            property_subregexes.append(subregex)
+        possible_patterns = []
+        for i in range(len(property_subregexes)):
+            pattern = ""
+            for subregex in property_subregexes[:i]:
+                pattern += f"({subregex}{whitespace_pattern},)?"
+            pattern += property_subregexes[i]
+            for subregex in property_subregexes[i + 1 :]:
+                pattern += f"({whitespace_pattern},{subregex})?"
+            possible_patterns.append(pattern)
+        regex += f"({'|'.join(possible_patterns)})?"
+    return regex
+
+
 def to_regex(
-    resolver: Resolver, instance: dict, whitespace_pattern: Optional[str] = None
+    resolver: Resolver,
+    instance: dict,
+    whitespace_pattern: Optional[str] = None,
+    ignore_fields_order: bool = False,
 ):
     """Translate a JSON Schema instance into a regex that validates the schema.
 
@@ -119,6 +180,9 @@ def to_regex(
     whitespace_pattern
         Pattern to use for JSON syntactic whitespace (doesn't impact string literals)
         Example: allow only a single space or newline with `whitespace_pattern=r"[\n ]?"`
+    ignore_fields_order
+        If True, the generated JSON will not be constrained by the order of the fields in the
+        schema.
     """
 
     # set whitespace pattern
@@ -130,44 +194,26 @@ def to_regex(
         regex += r"\{"
         properties = instance["properties"]
         required_properties = instance.get("required", [])
-        is_required = [item in required_properties for item in properties]
-        # If at least one property is required, we include the one in the lastest position
-        # without any comma.
-        # For each property before it (optional or required), we add with a comma after the property.
-        # For each property after it (optional), we add with a comma before the property.
-        if any(is_required):
-            last_required_pos = max([i for i, value in enumerate(is_required) if value])
-            for i, (name, value) in enumerate(properties.items()):
-                subregex = f'{whitespace_pattern}"{re.escape(name)}"{whitespace_pattern}:{whitespace_pattern}'
-                subregex += to_regex(resolver, value, whitespace_pattern)
-                if i < last_required_pos:
-                    subregex = f"{subregex}{whitespace_pattern},"
-                elif i > last_required_pos:
-                    subregex = f"{whitespace_pattern},{subregex}"
-                regex += subregex if is_required[i] else f"({subregex})?"
-        # If no property is required, we have to create a possible pattern for each property in which
-        # it's the last one necessarilly present. Then, we add the others as optional before and after
-        # following the same strategy as described above.
-        # The whole block is made optional to allow the case in which no property is returned.
-        else:
-            property_subregexes = []
-            for i, (name, value) in enumerate(properties.items()):
-                subregex = f'{whitespace_pattern}"{name}"{whitespace_pattern}:{whitespace_pattern}'
-                subregex += to_regex(resolver, value, whitespace_pattern)
-                property_subregexes.append(subregex)
-            possible_patterns = []
-            for i in range(len(property_subregexes)):
-                pattern = ""
-                for subregex in property_subregexes[:i]:
-                    pattern += f"({subregex}{whitespace_pattern},)?"
-                pattern += property_subregexes[i]
-                for subregex in property_subregexes[i + 1 :]:
-                    pattern += f"({whitespace_pattern},{subregex})?"
-                possible_patterns.append(pattern)
-            regex += f"({'|'.join(possible_patterns)})?"
-
+        # If ignore_fields_order is True, we generate a possible pattern for each
+        # permutation of the properties. Otherwise, we generate a single pattern
+        # that matches the properties in the given order.
+        perms: Iterable[Iterable[int]] = (
+            [list(range(len(properties)))]
+            if not ignore_fields_order
+            else permutations(list(range(len(properties))))
+        )
+        possible_patterns = [
+            _to_regex_properties(
+                resolver,
+                properties,
+                required_properties,
+                perm,
+                whitespace_pattern,
+            )
+            for perm in perms
+        ]
+        regex += "|".join(possible_patterns)
         regex += f"{whitespace_pattern}" + r"\}"
-
         return regex
 
     # To validate against allOf, the given data must be valid against all of the
