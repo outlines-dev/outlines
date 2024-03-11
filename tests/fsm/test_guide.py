@@ -1,6 +1,18 @@
 import pytest
+import torch
 
-from outlines.fsm.guide import CFGGuide, Generate, RegexGuide, StopAtEOSGuide, Write
+from outlines.fsm.guide import (
+    CFGGuide,
+    Generate,
+    RegexGuide,
+    StopAtEOSGuide,
+    Write,
+    add_crossing_tokens_states_to_tokens_map,
+    align_tokens_states_to_token_maps,
+    find_crossing_tokens,
+    get_crossing_tokens_target_states,
+    swap_state_ids_states_to_tokens_map,
+)
 
 
 def test_stop_at_eos():
@@ -22,6 +34,21 @@ def test_stop_at_eos():
     assert fsm.get_next_state(fsm.start_state, 1) == fsm.start_state
     assert fsm.is_final_state(fsm.start_state) is False
     assert fsm.is_final_state(fsm.final_state) is True
+
+
+def test_stop_at_eos_align_prompt_tokens():
+    class MockTokenizer:
+        vocabulary = {"a": 1, "ab": 2, "b": 3, "eos": 4}
+        eos_token_id = 4
+
+    fsm = StopAtEOSGuide(MockTokenizer())
+
+    token_ids, attention_masks = fsm.align_prompt_tokens(
+        torch.tensor([1]), torch.tensor([1])
+    )
+    assert torch.equal(token_ids, torch.tensor([]))
+    assert torch.equal(attention_masks, torch.tensor([]))
+    assert fsm.states_to_token_maps == {0: {1: 1, 2: 1}, 1: {1: 1, 2: 1, 3: 1, 4: -1}}
 
 
 def test_regex_vocabulary_error():
@@ -65,6 +92,27 @@ def test_regex():
 
     for state in fsm.final_states:
         assert fsm.is_final_state(state) is True
+
+
+def test_regex_align_prompt_tokens():
+    class MockTokenizer:
+        vocabulary = {"1": 1, "2": 2, "12": 3, "eos": 4}
+        special_tokens = {"eos"}
+        eos_token_id = 4
+
+        def convert_token_to_string(self, token):
+            return token
+
+    regex_str = "[1-9]"
+    tokenizer = MockTokenizer()
+    fsm = RegexGuide(regex_str, tokenizer)
+
+    token_ids, attention_masks = fsm.align_prompt_tokens(
+        torch.tensor([1, 1]), torch.tensor([1, 1])
+    )
+    assert torch.equal(token_ids, torch.tensor([1]))
+    assert torch.equal(attention_masks, torch.tensor([1]))
+    assert fsm.states_to_token_maps == {0: {1: 2, 3: 1}, 2: {1: 1, 2: 1}}
 
 
 def test_regex_final_state():
@@ -388,3 +436,214 @@ def test_cfg_allow_both_extend_and_shift_terminal():
     state = fsm.get_next_state(state=state, token_id=4)
     assert fsm.generation == "(aa)"
     assert fsm.is_final_state(state)
+
+
+@pytest.mark.parametrize(
+    "token_ids,vocabulary,expected_output",
+    [
+        # Several possible crossing tokens for the last prompt token
+        ([1, 2], {"a": 1, "ab": 2, "abc": 3, "abcd": 4}, {1: [3, 4]}),
+        # Several possible crossing tokens for the one before last prompt token
+        ([1, 2, 3], {"a": 1, "b": 2, "c": 3, "bcd": 4, "bcde": 5}, {1: [4, 5]}),
+        # Several possible crossing tokens for several different tokens of the prompt
+        (
+            [1, 2, 3],
+            {"a": 1, "b": 2, "c": 3, "cd": 4, "cde": 5, "bcd": 6, "bcde": 7},
+            {1: [6, 7], 2: [4, 5]},
+        ),
+        # No crossing token found
+        ([1, 2], {"a": 1, "b": 2, "c": 3, "cd": 4}, {}),
+    ],
+)
+def test_find_crossing_tokens(token_ids, vocabulary, expected_output):
+    assert find_crossing_tokens(token_ids, vocabulary) == expected_output
+
+
+@pytest.mark.parametrize(
+    "states_to_tokens_map,crossing_tokens,prompt_token_ids,vocabulary,expected_output",
+    [
+        # Only some of the crossing tokens are valid, several different target states
+        (
+            {
+                0: {8: 1, 10: 1, 11: -1},
+                1: {10: -1},
+            },
+            {1: [6, 7], 2: [4, 5]},
+            [1, 2, 3],
+            {
+                "a": 1,
+                "b": 2,
+                "c": 3,
+                "cd": 4,
+                "cde": 5,
+                "bcd": 6,
+                "bcdf": 7,
+                "d": 8,
+                "e": 9,
+                "f": 10,
+                "df": 11,
+            },
+            {1: {6: 1, 7: -1}, 2: {4: 1}},
+        ),
+        # No valid crossing tokens
+        (
+            {
+                0: {9: 1},
+                1: {8: 2, 11: -1},
+                2: {10: -1},
+            },
+            {1: [6, 7], 2: [4, 5]},
+            [1, 2, 3],
+            {
+                "a": 1,
+                "b": 2,
+                "c": 3,
+                "cd": 4,
+                "cde": 5,
+                "bcd": 6,
+                "bcdf": 7,
+                "d": 8,
+                "e": 9,
+                "f": 10,
+                "df": 11,
+            },
+            {},
+        ),
+    ],
+)
+def test_get_crossing_tokens_target_states(
+    states_to_tokens_map, crossing_tokens, prompt_token_ids, vocabulary, expected_output
+):
+    assert (
+        get_crossing_tokens_target_states(
+            states_to_tokens_map, crossing_tokens, prompt_token_ids, vocabulary
+        )
+        == expected_output
+    )
+
+
+@pytest.mark.parametrize(
+    "states_to_tokens_map,first_state_id,second_state_id,expected_output",
+    [
+        (
+            {
+                0: {10: 1, 11: 2, 12: -1},
+                1: {12: 2, 14: -1},
+                2: {15: 2, 16: 0, 17: -1},
+                3: {18: 0, 19: 1, 20: 2},
+            },
+            0,
+            3,
+            {
+                3: {10: 1, 11: 2, 12: -1},
+                1: {12: 2, 14: -1},
+                2: {15: 2, 16: 3, 17: -1},
+                0: {18: 3, 19: 1, 20: 2},
+            },
+        )
+    ],
+)
+def test_swap_state_ids_states_to_tokens_map(
+    states_to_tokens_map, first_state_id, second_state_id, expected_output
+):
+    assert (
+        swap_state_ids_states_to_tokens_map(
+            states_to_tokens_map, first_state_id, second_state_id
+        )
+        == expected_output
+    )
+
+
+def test_swap_state_ids_states_to_tokens_map_key_error():
+    with pytest.raises(KeyError):
+        swap_state_ids_states_to_tokens_map({0: {1: 1}, 1: {2: -1}}, 0, 2)
+
+
+@pytest.mark.parametrize(
+    "states_to_tokens_map,prompt_token_ids,crossing_tokens_map,expected_output",
+    [
+        # Add several new states to states_to_tokens_map
+        (
+            {
+                0: {10: 1, 11: 2, 12: -1},
+                1: {12: 2, 14: -1},
+                2: {15: 2, 16: 0, 17: -1},
+                3: {18: 0, 19: 1, 20: 2},
+            },
+            [6, 7, 8],
+            {
+                1: {20: 1, 21: 2},
+                2: {22: 1, 23: 3},
+            },
+            (
+                {
+                    4: {10: 1, 11: 2, 12: -1},
+                    1: {12: 2, 14: -1},
+                    2: {15: 2, 16: 4, 17: -1},
+                    3: {18: 4, 19: 1, 20: 2},
+                    0: {7: 5, 20: 1, 21: 2},
+                    5: {8: 4, 22: 1, 23: 3},
+                },
+                2,
+            ),
+        ),
+        # No crossing tokens, unchanged states_to_tokens_map
+        ({0: {1: -1, 2: -1}}, [5, 6, 7, 8], {}, ({0: {1: -1, 2: -1}}, 0)),
+    ],
+)
+def test_add_crossing_tokens_states_to_tokens_map(
+    states_to_tokens_map, prompt_token_ids, crossing_tokens_map, expected_output
+):
+    assert (
+        add_crossing_tokens_states_to_tokens_map(
+            states_to_tokens_map, prompt_token_ids, crossing_tokens_map
+        )
+        == expected_output
+    )
+
+
+@pytest.mark.parametrize(
+    "token_ids,attention_masks,vocabulary,states_to_token_maps,expected_output",
+    [
+        (
+            torch.tensor([1, 2, 3]),
+            torch.tensor([1, 1, 1]),
+            {
+                "a": 1,
+                "b": 2,
+                "c": 3,
+                "cd": 4,
+                "cde": 5,
+                "bcd": 6,
+                "bcdf": 7,
+                "d": 8,
+                "e": 9,
+                "f": 10,
+                "df": 11,
+            },
+            {
+                0: {8: 1, 10: 1, 11: -1},
+                1: {10: -1},
+            },
+            (
+                torch.tensor([1]),
+                torch.tensor([1]),
+                {
+                    2: {8: 1, 10: 1, 11: -1},
+                    1: {10: -1},
+                    0: {2: 3, 6: 1, 7: -1},
+                    3: {3: 2, 4: 1},
+                },
+            ),
+        )
+    ],
+)
+def test_align_tokens_states_to_token_maps(
+    token_ids, attention_masks, vocabulary, states_to_token_maps, expected_output
+):
+    assert (
+        align_tokens_states_to_token_maps(
+            token_ids, attention_masks, vocabulary, states_to_token_maps
+        )
+        == expected_output
+    )

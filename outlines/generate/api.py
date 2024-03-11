@@ -1,7 +1,8 @@
-from typing import Iterator, List, Optional, Union
+from typing import Iterator, List, Optional, Tuple, Union
 
 import torch
 
+from outlines.fsm.guide import Guide
 from outlines.generate.generator import sequence_generator
 
 
@@ -19,6 +20,53 @@ class SequenceGenerator:
         self.tokenizer = model.tokenizer
         self.device = device
         self.num_samples = sampler.samples
+
+    def align_prompt_tokens(
+        self,
+        prompt_token_ids: torch.Tensor,
+        attention_masks: torch.Tensor,
+        fsms: List[Guide],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Implement token alignment for each fsm. Return the updated tokens_ids and attention_masks"""
+        aligned_prompts, aligned_masks = zip(
+            *[
+                fsm.align_prompt_tokens(prompt, mask)
+                for prompt, mask, fsm in zip(prompt_token_ids, attention_masks, fsms)
+            ]
+        )
+        # We have to pad some of the prompts if they are not all of the same length after this operation
+        max_length_aligned_prompt = max(prompt.shape[0] for prompt in aligned_prompts)
+        padded_aligned_prompts = [
+            torch.cat(
+                [
+                    torch.full(
+                        (max_length_aligned_prompt - prompt.shape[0],),
+                        0,
+                        device=prompt_token_ids.device,
+                        dtype=prompt.dtype,
+                    ),
+                    prompt,
+                ]
+            )
+            for prompt in aligned_prompts
+        ]
+        padded_aligned_masks = [
+            torch.cat(
+                [
+                    torch.full(
+                        (max_length_aligned_prompt - mask.shape[0],),
+                        0,
+                        device=prompt_token_ids.device,
+                        dtype=mask.dtype,
+                    ),
+                    mask,
+                ]
+            )
+            for mask in aligned_masks
+        ]
+        aligned_prompt_token_ids = torch.stack(padded_aligned_prompts)
+        aligned_attention_masks = torch.stack(padded_aligned_masks)
+        return aligned_prompt_token_ids, aligned_attention_masks
 
     def get_generated_token_ids(
         self,
@@ -46,6 +94,19 @@ class SequenceGenerator:
         ]
 
         return token_ids
+
+    def get_generated_sequences(
+        self,
+        prompt_token_ids: List[torch.Tensor],
+        token_ids: List[torch.Tensor],
+    ) -> List[str]:
+        """Give the text sequences generated"""
+        sequences = self.tokenizer.decode(token_ids)
+        prompt_sequences = self.tokenizer.decode(prompt_token_ids)
+        return [
+            seq[len(prompt_seq) :]
+            for seq, prompt_seq in zip(sequences, prompt_sequences)
+        ]
 
     def is_stop_sequence_found(
         self, generated_sequences: List[str], stop_sequences: List[str]
@@ -175,10 +236,16 @@ class SequenceGenerator:
         num_samples = self.num_samples
         batch_size = len(prompts)
 
-        prompt_token_ids = torch.repeat_interleave(prompt_token_ids, num_samples, dim=0)
-        attention_masks = torch.repeat_interleave(attention_masks, num_samples, dim=0)
         fsm_states = [0 for _ in range(batch_size * num_samples)]
         fsms = [self.fsm.copy() for _ in range(batch_size * num_samples)]
+
+        prompt_token_ids = torch.repeat_interleave(prompt_token_ids, num_samples, dim=0)
+        attention_masks = torch.repeat_interleave(attention_masks, num_samples, dim=0)
+
+        aligned_prompt_token_ids, aligned_attention_masks = self.align_prompt_tokens(
+            prompt_token_ids, attention_masks, fsms
+        )
+
         weights = torch.zeros(
             (batch_size * num_samples), dtype=torch.float, device=self.device
         )
@@ -187,9 +254,9 @@ class SequenceGenerator:
             self.model,
             self.sampler,
             fsms,
-            prompt_token_ids,
+            aligned_prompt_token_ids,
             weights,
-            attention_masks,
+            aligned_attention_masks,
             fsm_states,
             rng=rng,
         )
@@ -204,17 +271,20 @@ class SequenceGenerator:
                     )
                     if max_tokens and len(generated_token_ids[0]) >= max_tokens:
                         break
-                    if stop_sequences and self.is_stop_sequence_found(
-                        self.tokenizer.decode(generated_token_ids), stop_sequences
-                    ):
-                        break
+                    if stop_sequences:
+                        generated_sequences = self.get_generated_sequences(
+                            prompt_token_ids, token_ids
+                        )
+                        if self.is_stop_sequence_found(
+                            generated_sequences, stop_sequences
+                        ):
+                            break
             except StopIteration:
                 break
 
         token_ids = last_state.token_ids
-        generated_token_ids = self.get_generated_token_ids(prompt_token_ids, token_ids)
 
-        generated = self.tokenizer.decode(generated_token_ids)
+        generated = self.get_generated_sequences(prompt_token_ids, token_ids)
         stripped = [
             self.strip_stop_sequences(sequence, stop_sequences)
             for sequence in generated
