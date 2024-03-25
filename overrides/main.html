@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block announce %}
+    For updates follow <strong>@dottxtai</strong> on
+    <a href="https://twitter.com/dottxtai">
+        <span class="twemoji twitter">
+        {% include ".icons/fontawesome/brands/twitter.svg" %}
+        </span>
+        <strong>Twitter</strong>
+    </a>
+    and
+    <span class="twemoji stat">
+    {% include ".icons/fontawesome/solid/star.svg" %}
+    </span>
+    the repo on
+    <a href="https://github.com/outlines-dev/outlines">
+        <span class="twemoji github">
+        {% include ".icons/fontawesome/brands/github.svg" %}
+        </span>
+        <strong>Github</strong>
+    </a>
+{% endblock %}
