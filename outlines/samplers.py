@@ -101,6 +101,9 @@ class MultinomialSampler:
         temperature: Optional[float] = None,
     ):
         self.samples = samples
+        self.top_k = top_k
+        self.top_p = top_p
+        self.temperature = temperature
 
         self.logits_processors = []
         if top_k is not None:
@@ -219,7 +222,7 @@ def rescale_logits(temperature: float) -> Callable[[torch.Tensor], torch.Tensor]
 
     if not isinstance(temperature, float) or temperature < 0.0:
         raise ValueError(
-            f"`temperature` must be a strictly negative floating point number, got {temperature} instead."
+            f"`temperature` must be a strictly positive floating point number, got {temperature} instead."
         )
     elif temperature == 0.0:
         raise ValueError(

@@ -1,8 +1,8 @@
 from functools import singledispatch
 
 from outlines.fsm.guide import StopAtEOSGuide
-from outlines.generate import SequenceGenerator
-from outlines.models import LlamaCpp, OpenAI
+from outlines.generate.api import SequenceGenerator, SequenceGeneratorAdapter
+from outlines.models import VLLM, LlamaCpp, OpenAI
 from outlines.models.llamacpp import LlamaSequenceGenerator
 from outlines.samplers import Sampler, multinomial
 
@@ -35,6 +35,11 @@ def text(model, sampler: Sampler = multinomial()) -> SequenceGenerator:
     generator = SequenceGenerator(fsm, model, sampler, device)
 
     return generator
+
+
+@text.register(VLLM)
+def text_vllm(model: VLLM, sampler: Sampler = multinomial()):
+    return SequenceGeneratorAdapter(model, None, sampler)
 
 
 @text.register(LlamaCpp)

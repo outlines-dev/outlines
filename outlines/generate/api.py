@@ -1,9 +1,11 @@
 import datetime
+from dataclasses import dataclass
 from typing import Iterator, List, Optional, Union
 
 import torch
 
 from outlines.generate.generator import sequence_generator
+from outlines.samplers import MultinomialSampler, GreedySampler, BeamSearchSampler
 
 FormattedOutput = Union[
     str, int, float, bool, datetime.date, datetime.time, datetime.datetime
@@ -371,3 +373,100 @@ class SequenceGenerator:
                     yield output
 
         return token_generator()
+
+
+@dataclass(frozen=True)
+class GenerationParameters:
+    prompts: Union[str, List[str]]
+    max_tokens: Optional[int]
+    stop_at: Optional[Union[str, List[str]]]
+    seed: Optional[int]
+
+
+@dataclass(frozen=True)
+class SamplingParameters:
+    sampler: str
+    num_samples: int = 1
+    top_p: Optional[float] = None
+    top_k: Optional[int] = None
+    temperature: Optional[float] = None
+
+
+class SequenceGeneratorAdapter:
+    def __init__(self, model, logits_processor, sampler):
+        self.model = model
+        self.logits_processor = logits_processor
+
+        if isinstance(sampler, MultinomialSampler):
+            self.sampling_params = SamplingParameters(
+                "multinomial",
+                sampler.samples,
+                sampler.top_p,
+                sampler.top_k,
+                sampler.temperature
+            )
+        elif isinstance(sampler, GreedySampler):
+            self.sampling_params = SamplingParameters(
+                "greedy",
+                sampler.samples,
+                None,
+                None,
+                0.
+            )
+        elif isinstance(sampler, BeamSearchSampler):
+            self.sampling_params = SamplingParameters(
+                "beam_search",
+                sampler.samples,
+                None,
+                None,
+                1.
+            )
+
+    def prepare_generation_parameters(
+        self,
+        prompts: Union[str, List[str]],
+        max_tokens: Optional[int],
+        stop_at: Optional[Union[str, List[str]]],
+        seed: Optional[int],
+    ):
+        if isinstance(stop_at, str):
+            stop_at = [stop_at]
+
+        generation_params = GenerationParameters(
+            prompts,
+            max_tokens,
+            stop_at,
+            seed,
+        )
+
+        return generation_params
+
+    def __call__(
+        self,
+        prompts: Union[str, List[str]],
+        max_tokens: Optional[int] = None,
+        stop_at: Optional[Union[str, List[str]]] = None,
+        seed: Optional[int] = None,
+        **model_specific_params,
+    ):
+        generation_params = self.prepare_generation_parameters(
+            prompts, max_tokens, stop_at, seed
+        )
+        return self.model.generate(
+            generation_params, self.logits_processor, self.sampling_params, **model_specific_params
+        )
+
+    def stream(
+        self,
+        prompts: Union[str, List[str]],
+        max_tokens: Optional[int] = None,
+        stop_at: Optional[Union[str, List[str]]] = None,
+        seed: Optional[int] = None,
+        **model_specific_params,
+    ):
+        generation_params = self.prepare_generation_parameters(
+            prompts, max_tokens, stop_at, seed
+        )
+        return self.model.stream(
+            generation_params, self.logits_processor, self.sampling_params, **model_specific_params
+        )
