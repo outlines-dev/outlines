@@ -12,5 +12,6 @@ from .llamacpp import LlamaCpp, llamacpp
 from .mamba import Mamba, mamba
 from .openai import OpenAI, openai
 from .transformers import Transformers, transformers
+from .vllm import VLLM, vllm
 
 LogitsGenerator = Union[Transformers, LlamaCpp, ExLlamaV2Model, Mamba]

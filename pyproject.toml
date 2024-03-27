@@ -58,7 +58,8 @@ test = [
     "responses",
     "llama-cpp-python",
     "huggingface_hub",
-    "openai>=1.0.0"
+    "openai>=1.0.0",
+    "vllm"
 ]
 serve = [
     "vllm>=0.3.0",
