@@ -75,7 +75,7 @@ def sequence_generator(
         allowed_tokens = get_allowed_tokens(fsms, fsm_states)
         biased_logits = bias_logits(logits, allowed_tokens)
         next_token_ids, ancestors, sequence_weights = sampler(
-            biased_logits, sequence_weights, rng
+            logits, biased_logits, sequence_weights, rng
         )
 
         token_ids = update_token_ids(token_ids, next_token_ids, ancestors)
