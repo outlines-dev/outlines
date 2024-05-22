@@ -5,7 +5,6 @@ import interegular
 from lark import Lark
 
 from outlines import grammars
-from outlines.caching import cache
 from outlines.fsm.regex import (
     create_fsm_index_tokenizer,
     make_byte_level_fsm,
@@ -111,7 +110,6 @@ class RegexGuide(Guide):
     initial_state = 0
 
     def __init__(self, regex_string: str, tokenizer):
-        @cache()
         def create_states_mapping(regex_string: str) -> Tuple[dict, set, set]:
             """Create the variables related to the mapping between states and tokens
             The parameters of the function are used for caching purpose
@@ -121,9 +119,7 @@ class RegexGuide(Guide):
                 regex_pattern.to_fsm().reduce(), keep_utf8=True
             )
             regex_fsm, _ = make_deterministic_fsm(byte_fsm)
-            states_to_token_maps, empty_token_ids = create_fsm_index_tokenizer(
-                regex_fsm, tokenizer
-            )
+            states_to_token_maps, _ = create_fsm_index_tokenizer(regex_fsm, tokenizer)
 
             # We make sure that it is possible to generate strings in the language
             # of the regular expression with the tokens present in the model's
@@ -136,11 +132,10 @@ class RegexGuide(Guide):
                     "The vocabulary does not allow us to build a sequence that matches the input regex"
                 )
 
-            return states_to_token_maps, empty_token_ids, regex_fsm.finals
+            return states_to_token_maps, regex_fsm.finals
 
         (
             self.states_to_token_maps,
-            self.empty_token_ids,
             fsm_finals,
         ) = create_states_mapping(regex_string)
         self.eos_token_id = tokenizer.eos_token_id
@@ -217,9 +212,7 @@ class RegexGuide(Guide):
             """
             byte_fsm = make_byte_level_fsm(fsm.reduce(), keep_utf8=True)
             regex_fsm, _ = make_deterministic_fsm(byte_fsm)
-            states_to_token_maps, empty_token_ids = create_fsm_index_tokenizer(
-                regex_fsm, tokenizer
-            )
+            states_to_token_maps, _ = create_fsm_index_tokenizer(regex_fsm, tokenizer)
 
             # We make sure that it is possible to generate strings in the language
             # of the regular expression with the tokens present in the model's
@@ -232,11 +225,10 @@ class RegexGuide(Guide):
                     "The vocabulary does not allow us to build a sequence that matches the input regex"
                 )
 
-            return states_to_token_maps, empty_token_ids
+            return states_to_token_maps
 
         (
             from_interegular_instance.states_to_token_maps,
-            from_interegular_instance.empty_token_ids,
         ) = create_states_mapping_from_interegular_fsm(interegular_fsm)
         from_interegular_instance.eos_token_id = tokenizer.eos_token_id
         return from_interegular_instance

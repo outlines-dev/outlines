@@ -1,6 +1,5 @@
 import re
 from collections import namedtuple
-from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -112,7 +111,7 @@ nb_int_pair_type = numba.types.UniTuple(numba.int64, 2)
 nb_unichar_2_type = numba.types.UnicodeCharSeq(2)
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=False)
 def create_fsm_info(
     py_initial,
     py_finals,
@@ -411,7 +410,7 @@ def make_deterministic_fsm(fsm: FSM) -> Tuple[BetterFSM, Dict[int, int]]:
     return new_fsm, old_to_new_states
 
 
-@numba.njit(nogil=True, cache=True)
+@numba.njit(nogil=True, cache=False)
 def _walk_fsm(
     fsm_transitions: Dict[Tuple[int, int], int],
     alphabet_symbol_mapping: Dict[str, int],
@@ -647,7 +646,7 @@ def get_sub_fsms_from_seq(
     )
 
 
-@numba.njit(cache=True, nogil=True)
+@numba.njit(cache=False, nogil=True)
 def state_scan_tokens(
     fsm_transitions: Dict[Tuple[int, int], int],
     alphabet_symbol_mapping: Dict[str, int],
@@ -723,7 +722,6 @@ re_replacement_seq = re.compile(r"^▁*�+$")
 
 
 # Copied from transformers.models.gpt2.tokenization_gpt2.bytes_to_unicode
-@lru_cache()
 def gpt2_bytes_to_unicode():
     """
     Returns list of utf-8 byte and a mapping to unicode strings. We specifically avoids mapping to whitespace/control
@@ -750,14 +748,12 @@ def gpt2_bytes_to_unicode():
     return dict(zip(bs, cs))
 
 
-@lru_cache()
 def gpt2_unicode_to_bytes():
     return {v: k for k, v in gpt2_bytes_to_unicode().items()}
 
 
 # TODO: Cannot cache typed collections to disk, yet.  See
 # https://github.com/numba/numba/issues/4698
-@lru_cache
 def reduced_vocabulary(
     tokenizer: "Tokenizer",
 ) -> Tuple[List[Tuple[Sequence[str], Sequence[int]]], Set[int]]:

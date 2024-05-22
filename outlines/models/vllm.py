@@ -1,7 +1,9 @@
+import concurrent.futures
 import dataclasses
 from typing import TYPE_CHECKING, List, Optional, Union
 
 from outlines.generate.api import GenerationParameters, SamplingParameters
+from outlines.integrations.utils import adapt_tokenizer
 
 if TYPE_CHECKING:
     from vllm import LLM
@@ -18,7 +20,7 @@ class VLLM:
 
     """
 
-    def __init__(self, model: "LLM"):
+    def __init__(self, model: "LLM", tokenizer):
         self.model = model
         self.lora_request = None
 
@@ -73,6 +75,9 @@ class VLLM:
         # are specified by the user when calling the generator.
         if max_tokens is not None:
             sampling_params.max_tokens = max_tokens
+        else:
+            sampling_params.max_tokens = None
+
         if stop_at is not None:
             if isinstance(stop_at, str):
                 stop_at = [stop_at]
@@ -140,7 +145,40 @@ class VLLM:
             self.lora_request = LoRARequest(adapter_path, 1, adapter_path)
 
 
-def vllm(model_name: str, **vllm_model_params):
+def load_model(model_name, **vllm_model_params):
+    """Load the model in GPU memory."""
+    from vllm import LLM
+
+    model = LLM(model_name, **vllm_model_params)
+    return model
+
+
+def load_and_convert_tokenizer(model_name):
+    """Convert vocabulary types and JIT-compile function."""
+    from transformers import AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = convert_tokenizer(tokenizer)
+    jit_compile_numba(tokenizer.numba_vocabulary)
+
+    return tokenizer
+
+
+def convert_tokenizer(tokenizer):
+    from outlines.fsm.regex import reduced_vocabulary
+
+    tokenizer = adapt_tokenizer(tokenizer)
+    vocabulary, _ = reduced_vocabulary(tokenizer)
+    tokenizer.vocabulary_numba = vocabulary
+
+    return tokenizer
+
+
+def jit_compile_numba(vocabulary):
+    pass
+
+
+def vllm(model_or_model_name: Union[str, "LLM"], **vllm_model_params):
     """Load a vLLM model.
 
     Arguments
@@ -154,6 +192,16 @@ def vllm(model_name: str, **vllm_model_params):
     """
     from vllm import LLM
 
-    model = LLM(model_name, **vllm_model_params)
+    if isinstance(model_or_model_name, LLM):
+        model = model_or_model_name
+        tokenizer = convert_tokenizer(model.tokenizer)
+    else:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            model_name = model_or_model_name
+            future_model = executor.submit(load_model, model_name, **vllm_model_params)
+            future_tokenizer = executor.submit(load_and_convert_tokenizer, model_name)
 
-    return VLLM(model)
+            tokenizer = future_tokenizer.result()
+            model = future_model.result()
+
+    return VLLM(model, tokenizer)
