@@ -1,11 +1,11 @@
 import json as pyjson
 from functools import singledispatch
-from typing import Callable, Optional, Union
+from typing import Callable, Dict, Optional, Union
 
 from pydantic import BaseModel
 
 from outlines.fsm.json_schema import build_regex_from_schema, get_schema_from_signature
-from outlines.generate.api import SequenceGenerator
+from outlines.generate.api import SequenceGenerator, SequenceGeneratorAdapter
 from outlines.models import OpenAI
 from outlines.samplers import Sampler, multinomial
 
@@ -15,10 +15,10 @@ from .regex import regex
 @singledispatch
 def json(
     model,
-    schema_object: Union[str, object, Callable],
+    schema_object: Union[str, object, Callable, Dict],
     sampler: Sampler = multinomial(),
     whitespace_pattern: Optional[str] = None,
-) -> SequenceGenerator:
+) -> Union[SequenceGenerator, SequenceGeneratorAdapter]:
     """
     Generate structured JSON data with a `Transformer` model based on a specified JSON Schema.
 
@@ -39,7 +39,7 @@ def json(
 
     Returns
     -------
-    A `SequenceGenerator` instance that generates text constrained by the schema_object and
+    A `SequenceGenerator` or `SequenceGeneratorAdapter` instance that generates text constrained by the schema_object and
     transforms the result if BaseModel is used.
 
     """
@@ -53,6 +53,11 @@ def json(
         regex_str = build_regex_from_schema(schema, whitespace_pattern)
         generator = regex(model, regex_str, sampler)
         generator.format_sequence = lambda x: pyjson.loads(x)
+    elif isinstance(schema_object, Dict):
+        schema = pyjson.dumps(schema_object)
+        regex_str = build_regex_from_schema(schema, whitespace_pattern)
+        generator = regex(model, regex_str, sampler)
+        generator.format_sequence = lambda x: pyjson.loads(x)
     elif isinstance(schema_object, str):
         schema = schema_object
         regex_str = build_regex_from_schema(schema, whitespace_pattern)
@@ -61,7 +66,8 @@ def json(
     else:
         raise ValueError(
             f"Cannot parse schema {schema_object}. The schema must be either "
-            + "a Pydantic object, a function or a string that contains the JSON "
+            + "a Pydantic object, a function, a dictionary that contains the "
+            + "JSON Schema specification, or a string that contains the JSON "
             + "Schema specification"
         )
 

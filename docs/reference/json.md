@@ -50,13 +50,11 @@ print(result)
 
     Outlines provides [custom Pydantic types](types.md) so you do not have to write regular expressions for common types, such as phone numbers or zip codes.
 
-## Using a JSON Schema
+## Using a String of a JSON Schema
 
 Instead of a Pydantic model you can pass a string that represents a [JSON Schema](https://json-schema.org/) specification to `generate.json`:
 
 ```python
-from pydantic import BaseModel
-
 from outlines import models
 from outlines import generate
 
@@ -81,6 +79,35 @@ result = generator(
 print(result)
 # User(name="John", last_name="Doe", id=11)
 ```
+
+## Using a Dictionary of a JSON Schema
+
+You can also pass in dictionary that represents a [JSON Schema](https://json-schema.org/) specification to `generate.json`:
+
+```python
+from outlines import models
+from outlines import generate
+
+model = models.transformers("mistralai/Mistral-7B-v0.1")
+
+schema_dict = {
+  "title": "User",
+  "type": "object",
+  "properties": {
+    "name": {"type": "string"},
+    "last_name": {"type": "string"},
+    "id": {"type": "integer"}
+  }
+}
+
+generator = generate.json(model, schema_dict)
+result = generator(
+    "Create a user profile with the fields name, last_name and id"
+)
+print(result)
+# User(name="John", last_name="Doe", id=11)
+```
+
 
 ## From a function's signature
 
