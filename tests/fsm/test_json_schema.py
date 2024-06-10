@@ -20,6 +20,7 @@ from outlines.fsm.json_schema import (
     WHITESPACE,
     build_regex_from_schema,
     get_schema_from_signature,
+    optimize_schema,
     to_regex,
 )
 
@@ -838,3 +839,174 @@ def test_one_of_doesnt_produce_illegal_lookaround():
 
     # check if the pattern uses lookarounds incompatible with interegular.Pattern.to_fsm()
     interegular.parse_pattern(pattern).to_fsm()
+
+
+@pytest.mark.parametrize(
+    "schema,expected_schema",
+    [
+        # No optimizations possible
+        (
+            {
+                "properties": {"field_a": {"title": "Field A", "type": "integer"}},
+                "required": ["field_a"],
+                "title": "Test",
+                "type": "object",
+            },
+            {
+                "properties": {"field_a": {"title": "Field A", "type": "integer"}},
+                "required": ["field_a"],
+                "title": "Test",
+                "type": "object",
+            },
+        ),
+        # Makes fields with null type in anyOf optional
+        # and removes null fields
+        (
+            {
+                "properties": {
+                    "field_a": {"title": "Field A", "type": "integer"},
+                    "field_b": {
+                        "anyOf": [{"type": "integer"}, {"type": "null"}],
+                        "title": "Field B",
+                    },
+                    "field_c": {"title": "Field C", "type": "null"},
+                },
+                "required": ["field_a", "field_b", "field_c"],
+                "title": "Test",
+                "type": "object",
+            },
+            {
+                "properties": {
+                    "field_a": {"title": "Field A", "type": "integer"},
+                    "field_b": {"title": "Field B", "type": "integer"},
+                },
+                "required": ["field_a"],
+                "title": "Test",
+                "type": "object",
+            },
+        ),
+        # Multilevel example
+        (
+            {
+                "$defs": {
+                    "TestCell": {
+                        "properties": {
+                            "g": {"title": "G", "type": "integer"},
+                            "h": {
+                                "anyOf": [{"type": "string"}, {"type": "null"}],
+                                "title": "H",
+                            },
+                        },
+                        "required": ["g", "h"],
+                        "title": "TestCell",
+                        "type": "object",
+                    },
+                    "TestLineItem": {
+                        "properties": {
+                            "a": {"title": "A", "type": "integer"},
+                            "b": {
+                                "anyOf": [{"type": "integer"}, {"type": "null"}],
+                                "title": "B",
+                            },
+                            "c": {"title": "C", "type": "string"},
+                            "d": {
+                                "anyOf": [{"type": "string"}, {"type": "null"}],
+                                "title": "D",
+                            },
+                            "e": {"title": "E", "type": "null"},
+                            "f": {
+                                "anyOf": [{"type": "integer"}, {"type": "string"}],
+                                "title": "F",
+                            },
+                            "i": {"$ref": "#/$defs/TestCell"},
+                        },
+                        "required": ["a", "b", "c", "d", "e", "f", "i"],
+                        "title": "TestLineItem",
+                        "type": "object",
+                    },
+                },
+                "properties": {
+                    "line_items": {
+                        "anyOf": [
+                            {
+                                "items": {"$ref": "#/$defs/TestLineItem"},
+                                "type": "array",
+                            },
+                            {"type": "null"},
+                        ],
+                        "title": "Line Items",
+                    }
+                },
+                "required": ["line_items"],
+                "title": "TestTable",
+                "type": "object",
+            },
+            {
+                "$defs": {
+                    "TestCell": {
+                        "properties": {
+                            "g": {"title": "G", "type": "integer"},
+                            "h": {"title": "H", "type": "string"},
+                        },
+                        "required": ["g"],
+                        "title": "TestCell",
+                        "type": "object",
+                    },
+                    "TestLineItem": {
+                        "properties": {
+                            "a": {"title": "A", "type": "integer"},
+                            "b": {"title": "B", "type": "integer"},
+                            "c": {"title": "C", "type": "string"},
+                            "d": {"title": "D", "type": "string"},
+                            "f": {
+                                "anyOf": [{"type": "integer"}, {"type": "string"}],
+                                "title": "F",
+                            },
+                            "i": {"$ref": "#/$defs/TestCell"},
+                        },
+                        "required": ["a", "c", "f", "i"],
+                        "title": "TestLineItem",
+                        "type": "object",
+                    },
+                },
+                "properties": {
+                    "line_items": {
+                        "title": "Line Items",
+                        "items": {"$ref": "#/$defs/TestLineItem"},
+                        "type": "array",
+                    },
+                },
+                "required": [],
+                "title": "TestTable",
+                "type": "object",
+            },
+        ),
+        # From function signature
+        (
+            {
+                "properties": {
+                    "a": {"title": "A", "type": "integer"},
+                    "b": {
+                        "anyOf": [{"type": "integer"}, {"type": "null"}],
+                        "title": "B",
+                    },
+                },
+                "required": ["a", "b"],
+                "title": "Arguments",
+                "type": "object",
+            },
+            {
+                "properties": {
+                    "a": {"title": "A", "type": "integer"},
+                    "b": {"title": "B", "type": "integer"},
+                },
+                "required": ["a"],
+                "title": "Arguments",
+                "type": "object",
+            },
+        ),
+    ],
+)
+def test_json_schema_optimization(schema: dict, expected_schema: dict):
+    optimized_schema = optimize_schema(schema)
+    assert optimized_schema == expected_schema

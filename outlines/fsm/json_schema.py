@@ -2,7 +2,8 @@ import inspect
 import json
 import re
 import warnings
-from typing import Callable, Optional
+from copy import deepcopy
+from typing import Callable, List, Optional
 
 from jsonschema.protocols import Validator
 from pydantic import create_model
@@ -39,7 +40,11 @@ format_to_regex = {
 }
 
 
-def build_regex_from_schema(schema: str, whitespace_pattern: Optional[str] = None):
+def build_regex_from_schema(
+    schema: str,
+    whitespace_pattern: Optional[str] = None,
+    enable_schema_optimization: bool = False,
+):
     """Turn a JSON schema into a regex that matches any JSON object that follows
     this schema.
 
@@ -58,6 +63,12 @@ def build_regex_from_schema(schema: str, whitespace_pattern: Optional[str] = Non
     whitespace_pattern
         Pattern to use for JSON syntactic whitespace (doesn't impact string literals)
         Example: allow only a single space or newline with `whitespace_pattern=r"[\n ]?"`
+    enable_schema_optimization:
+        If True, this will speed up generation by not requiring optional keys to be
+        present in the output. This is especially useful for large schemas with many
+        optional keys. Note though that this further restricts the support
+        distribution. Thus, it is necessary to remove the optional keys from the
+        finetuning dataset as well if needed. Hence, we set this to False by default.
 
     Returns
     -------
@@ -81,7 +92,74 @@ def build_regex_from_schema(schema: str, whitespace_pattern: Optional[str] = Non
     resolver = registry.resolver()
 
     content = schema.contents
+    if enable_schema_optimization:
+        content = optimize_schema(content)
     return to_regex(resolver, content, whitespace_pattern)
+
+
+def _is_null_type(instance: dict):
+    if "type" in instance and (instance["type"] == "null" or instance["type"] is None):
+        return True
+    if "const" in instance and (
+        instance["const"] == "null" or instance["const"] is None
+    ):
+        return True
+    return False
+
+
+def _has_null_type(instance_list: List[dict]):
+    for instance in instance_list:
+        if _is_null_type(instance):
+            return True
+    return False
+
+
+def optimize_schema(instance):
+    instance_copy = deepcopy(instance)
+    if "$defs" in instance_copy:
+        instance_copy["$defs"] = {
+            key: optimize_schema(subinstance)
+            for key, subinstance in instance_copy["$defs"].items()
+        }
+    if "properties" in instance_copy:
+        new_optional_keys = set()
+        keys_to_remove = set()
+        for key, subinstance in instance_copy["properties"].items():
+            subinstance = optimize_schema(subinstance)
+            if "type" in subinstance:
+                subinstance_type = subinstance["type"]
+                if subinstance_type == "null":
+                    keys_to_remove.add(key)
+                elif (
+                    subinstance_type == "array" and subinstance.get("minItems", 0) == 0
+                ):
+                    new_optional_keys.add(key)
+            elif "anyOf" in subinstance and _has_null_type(subinstance["anyOf"]):
+                any_of_list = subinstance.pop("anyOf")
+                filtered_any_of_list = list(
+                    filter(lambda d: not _is_null_type(d), any_of_list)
+                )
+                if len(filtered_any_of_list) == 0:
+                    keys_to_remove.add(key)
+                elif len(filtered_any_of_list) == 1:
+                    subinstance = {**subinstance, **filtered_any_of_list[0]}
+                    instance_copy["properties"][key] = subinstance
+                    new_optional_keys.add(key)
+                else:
+                    subinstance["anyOf"] = filtered_any_of_list
+                    new_optional_keys.add(key)
+        if "required" in instance_copy:
+            instance_copy["required"] = [
+                key
+                for key in instance_copy["required"]
+                if key not in new_optional_keys and key not in keys_to_remove
+            ]
+        instance_copy["properties"] = {
+            key: value
+            for key, value in instance_copy["properties"].items()
+            if key not in keys_to_remove
+        }
+    return instance_copy
 
 
 def _get_num_items_pattern(min_items, max_items, whitespace_pattern):

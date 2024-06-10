@@ -140,6 +140,7 @@ class JSONPrefixAllowedTokens(RegexPrefixAllowedTokens):
         schema: Union[dict, Type[BaseModel], str],
         tokenizer_or_pipe: Union[PreTrainedTokenizerBase, Pipeline],
         whitespace_pattern: Optional[str] = None,
+        enable_schema_optimization: bool = False,
     ):
         """Compile the FSM that drives the JSON-guided generation.
 
@@ -153,7 +154,15 @@ class JSONPrefixAllowedTokens(RegexPrefixAllowedTokens):
             Pattern to use for JSON syntactic whitespace (doesn't impact string
             literals). For example, to allow only a single space or newline with
             `whitespace_pattern=r"[\n ]?"`
+        enable_schema_optimization:
+            If True, this will speed up generation by not requiring optional keys to be
+            present in the output. This is especially useful for large schemas with many
+            optional keys. Note though that this further restricts the support
+            distribution. Thus, it is necessary to remove the optional keys from the
+            finetuning dataset as well if needed. Hence, we set this to False by default.
         """
         schema_str = convert_json_schema_to_str(json_schema=schema)
-        regex_string = build_regex_from_schema(schema_str, whitespace_pattern)
+        regex_string = build_regex_from_schema(
+            schema_str, whitespace_pattern, enable_schema_optimization
+        )
         super().__init__(regex_string=regex_string, tokenizer_or_pipe=tokenizer_or_pipe)

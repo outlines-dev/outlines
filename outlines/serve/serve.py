@@ -68,8 +68,17 @@ async def generate(request: Request) -> Response:
 
     json_schema = request_dict.pop("schema", None)
     regex_string = request_dict.pop("regex", None)
+    whitespace_pattern = request_dict.pop("whitespace_pattern", None)
+    enable_schema_optimization = request_dict.pop("enable_schema_optimization", False)
     if json_schema is not None:
-        logits_processors = [JSONLogitsProcessor(json_schema, engine.engine)]
+        logits_processors = [
+            JSONLogitsProcessor(
+                json_schema,
+                engine.engine,
+                whitespace_pattern,
+                enable_schema_optimization,
+            )
+        ]
     elif regex_string is not None:
         logits_processors = [RegexLogitsProcessor(regex_string, engine.engine)]
     else:
