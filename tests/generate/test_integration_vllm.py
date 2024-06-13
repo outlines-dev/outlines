@@ -2,7 +2,8 @@ import datetime
 import re
 
 import pytest
-import torch
+
+# import torch
 from pydantic import BaseModel, constr
 from vllm.sampling_params import SamplingParams
 
@@ -11,9 +12,9 @@ import outlines.grammars as grammars
 import outlines.models as models
 import outlines.samplers as samplers
 
-pytestmark = pytest.mark.skipif(
-    not torch.cuda.is_available(), reason="vLLM models can only be run on GPU."
-)
+# pytestmark = pytest.mark.skipif(
+#     not torch.cuda.is_available(), reason="vLLM models can only be run on GPU."
+# )
 
 
 @pytest.fixture(scope="module")
@@ -230,9 +231,6 @@ def test_vllm_json_schema(model):
     assert isinstance(result["bar"], str)
 
 
-@pytest.mark.xfail(
-    reason="The CFG logits processor for vLLM has not been implemented yet."
-)
 def test_vllm_cfg(model):
     prompt = "<|im_start|>user\nOutput a short and valid JSON object with two keys.<|im_end|>\n><|im_start|>assistant\n"
     result = generate.cfg(model, grammars.arithmetic)(prompt, seed=11)

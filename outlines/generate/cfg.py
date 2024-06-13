@@ -2,6 +2,7 @@ from functools import singledispatch
 
 from outlines.fsm.guide import CFGGuide
 from outlines.generate.api import SequenceGenerator, SequenceGeneratorAdapter
+from outlines.integrations.vllm import CFGLogitsProcessor
 from outlines.models import OpenAI
 from outlines.models.llamacpp import LlamaCpp
 from outlines.models.vllm import VLLM
@@ -39,9 +40,10 @@ def cfg_vllm(
     cfg_str: str,
     sampler: Sampler = multinomial(),
 ):
-    raise NotImplementedError(
-        "The CFG Logits processor is not available for the vLLM integration."
-    )
+    logits_processor = CFGLogitsProcessor(cfg_str, model.model)
+    generator = SequenceGeneratorAdapter(model, logits_processor, sampler)
+
+    return generator
 
 
 @cfg.register(LlamaCpp)
