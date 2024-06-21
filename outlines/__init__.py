@@ -2,6 +2,7 @@
 import outlines.generate
 import outlines.grammars
 import outlines.models
+import outlines.processors
 import outlines.types
 from outlines.base import vectorize
 from outlines.caching import clear_cache, disable_cache, get_cache

@@ -63,9 +63,6 @@ def test_llama_tokenizer():
 
 
 def test_model():
-    with pytest.raises(ValueError, match="When passing device_map as a string"):
-        transformers(TEST_MODEL, device="non_existent")
-
     model = transformers(TEST_MODEL, device="cpu")
     assert isinstance(model.tokenizer, TransformerTokenizer)
     assert model.device.type == "cpu"

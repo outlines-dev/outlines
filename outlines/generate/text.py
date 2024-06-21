@@ -2,7 +2,7 @@ from functools import singledispatch
 
 from outlines.fsm.guide import StopAtEOSGuide
 from outlines.generate.api import SequenceGenerator, SequenceGeneratorAdapter
-from outlines.models import MLXLM, VLLM, LlamaCpp, OpenAI
+from outlines.models import MLXLM, VLLM, LlamaCpp, OpenAI, Transformers
 from outlines.samplers import Sampler, multinomial
 
 
@@ -37,7 +37,8 @@ def text(model, sampler: Sampler = multinomial()) -> SequenceGenerator:
 
 
 @text.register(MLXLM)
-def text_mlxlm(model: MLXLM, sampler: Sampler = multinomial()):
+@text.register(Transformers)
+def text_unified(model, sampler: Sampler = multinomial()):
     return SequenceGeneratorAdapter(model, None, sampler)
 
 

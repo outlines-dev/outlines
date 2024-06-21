@@ -24,7 +24,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import math
-from typing import TYPE_CHECKING, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
 
 import numpy as np
 import torch
@@ -35,13 +35,13 @@ from outlines.fsm.guide import CFGGuide, Guide, RegexGuide
 from outlines.fsm.json_schema import build_regex_from_schema
 from outlines.integrations.utils import convert_json_schema_to_str
 
-from .base_logits_processor import BaseLogitsProcessor
+from .base_logits_processor import OutlinesLogitsProcessor
 
 if TYPE_CHECKING:
     from outlines.models.tokenizer import Tokenizer
 
 
-class FSMLogitsProcessor(BaseLogitsProcessor):
+class FSMLogitsProcessor(OutlinesLogitsProcessor):
     """Bias generation using a finite state machine.
 
     Attributes
@@ -63,12 +63,13 @@ class FSMLogitsProcessor(BaseLogitsProcessor):
             The finite state machine which is used to bias the logits.
         """
         self.tokenizer = tokenizer
-        self._fsm_state = 0
+        self._fsm_states: Dict[int, int] = {}
         self.fsm: Guide = fsm
         self._is_first_token = True
+        self._seq_start_idx: Optional[int] = None
 
     def process_logits(
-        self, input_ids: List[int], logits: torch.Tensor
+        self, input_ids: List[List[int]], logits: torch.Tensor
     ) -> NDArray[np.float32]:
         """Use the FSM to bias the logits before sampling the next token.
 
@@ -84,17 +85,31 @@ class FSMLogitsProcessor(BaseLogitsProcessor):
         torch.Tensor
             The biased logits.
         """
+        sequence_states: List[int] = []  # vector of states corresponding to `input_ids`
+
         if self._is_first_token:
             self._is_first_token = False
-        else:
-            last_token = input_ids[-1]
-            self._fsm_state = self.fsm.get_next_state(self._fsm_state, last_token)
+            self._seq_start_idx = len(input_ids[0])
 
-        allowed_tokens = self.fsm.get_next_instruction(self._fsm_state).tokens
-        allowed_tokens = torch.tensor(allowed_tokens, device=logits.device)
+            self._fsm_states = {hash(tuple([])): 0}
+            sequence_states = [0] * len(input_ids)
+
+        else:
+            for seq_ids in input_ids:
+                prev_state_key = hash(tuple(seq_ids[self._seq_start_idx : -1]))
+                prev_state = self._fsm_states[prev_state_key]
+
+                curr_state_key = hash(tuple(seq_ids[self._seq_start_idx :]))
+                curr_state = self.fsm.get_next_state(prev_state, seq_ids[-1])
+
+                self._fsm_states[curr_state_key] = curr_state
+                sequence_states.append(curr_state)
 
         mask = torch.full_like(logits, -math.inf)
-        mask[allowed_tokens] = logits[allowed_tokens]
+        for i, fsm_state in enumerate(sequence_states):
+            allowed_tokens = self.fsm.get_next_instruction(fsm_state).tokens
+            mask[i, allowed_tokens] = logits[i, allowed_tokens]
+
         return mask
 
     def copy(self) -> "FSMLogitsProcessor":

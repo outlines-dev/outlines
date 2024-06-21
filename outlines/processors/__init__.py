@@ -1,7 +1,7 @@
 from .structured import (
-    BaseLogitsProcessor,
     CFGLogitsProcessor,
     FSMLogitsProcessor,
     JSONLogitsProcessor,
+    OutlinesLogitsProcessor,
     RegexLogitsProcessor,
 )

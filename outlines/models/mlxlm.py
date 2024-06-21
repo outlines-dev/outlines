@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from transformers import PreTrainedTokenizer
 
     from outlines.generate.api import GenerationParameters, SamplingParameters
-    from outlines.processors import BaseLogitsProcessor
+    from outlines.processors import OutlinesLogitsProcessor
 
 
 class MLXLM:
@@ -120,7 +120,7 @@ class MLXLM:
         temp: Optional[float],
         top_p: Optional[float],
         sampler: str,
-        logits_processor: "BaseLogitsProcessor",
+        logits_processor: "OutlinesLogitsProcessor",
     ) -> Generator[Tuple[int, float], None, None]:
         """
         Adapted from
@@ -135,7 +135,7 @@ class MLXLM:
                 top_p (float, optional): Nulceus sampling, higher means model considers
                   more less likely words.
                 sampler (str): The sampler string defined by SequenceGeneratorAdapter
-                logits_processor (BaseLogitsProcessor): Augment logits before sampling.
+                logits_processor (OutlinesLogitsProcessor): Augment logits before sampling.
         """
         import mlx.core as mx
         import mlx_lm

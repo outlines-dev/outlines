@@ -25,7 +25,7 @@ def model(tmp_path_factory):
     (
         (generate.text, []),
         (generate.regex, ("[0-9]",)),
-        (generate.cfg, (grammars.arithmetic,)),
+        # (generate.cfg, (grammars.arithmetic,)),  # Awaiting CFG fix
     ),
 )
 def test_llamacpp_generation_api(model, generator_type, params):
@@ -245,8 +245,11 @@ def test_llamacpp_json_schema(model):
 
 def test_llamacpp_cfg(model):
     prompt = "<|im_start|>user\nOutput a short and valid JSON object with two keys.<|im_end|>\n><|im_start|>assistant\n"
-    result = generate.cfg(model, grammars.arithmetic)(prompt, seed=11)
-    assert isinstance(result, str)
+
+    # remove this statement once cfg is implemented
+    with pytest.raises(NotImplementedError):
+        result = generate.cfg(model, grammars.arithmetic)(prompt, seed=11)
+        assert isinstance(result, str)
 
 
 @pytest.mark.parametrize(

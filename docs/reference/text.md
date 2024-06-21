@@ -80,8 +80,7 @@ from outlines import models, generate
 
 model = models.transformers("mistralai/Mistral-7B-v0.1")
 
-rng = torch.Generator(device="cuda")
-rng.manual_seed(789001)
+seed = 789001
 
-answer = generator("What is 2+2?", rng=rng)
+answer = generator("What is 2+2?", seed=seed)
 ```

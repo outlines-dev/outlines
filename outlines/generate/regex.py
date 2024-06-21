@@ -5,6 +5,7 @@ from outlines.generate.api import SequenceGenerator, SequenceGeneratorAdapter
 from outlines.models import OpenAI
 from outlines.models.llamacpp import LlamaCpp
 from outlines.models.mlxlm import MLXLM
+from outlines.models.transformers import Transformers
 from outlines.models.vllm import VLLM
 from outlines.samplers import Sampler, multinomial
 
@@ -39,8 +40,9 @@ def regex(model, regex_str: str, sampler: Sampler = multinomial()):
 
 
 @regex.register(MLXLM)
-def regex_mlxlm(
-    model: MLXLM,
+@regex.register(Transformers)
+def regex_unified(
+    model,
     regex_str: str,
     sampler: Sampler = multinomial(),
 ):
