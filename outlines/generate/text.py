@@ -38,17 +38,13 @@ def text(model, sampler: Sampler = multinomial()) -> SequenceGenerator:
 
 @text.register(MLXLM)
 @text.register(Transformers)
+@text.register(LlamaCpp)
 def text_unified(model, sampler: Sampler = multinomial()):
     return SequenceGeneratorAdapter(model, None, sampler)
 
 
 @text.register(VLLM)
 def text_vllm(model: VLLM, sampler: Sampler = multinomial()):
-    return SequenceGeneratorAdapter(model, None, sampler)
-
-
-@text.register(LlamaCpp)
-def text_llamacpp(model: LlamaCpp, sampler: Sampler = multinomial()):
     return SequenceGeneratorAdapter(model, None, sampler)
 
 

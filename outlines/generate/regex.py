@@ -41,6 +41,7 @@ def regex(model, regex_str: str, sampler: Sampler = multinomial()):
 
 @regex.register(MLXLM)
 @regex.register(Transformers)
+@regex.register(LlamaCpp)
 def regex_unified(
     model,
     regex_str: str,
@@ -49,18 +50,6 @@ def regex_unified(
     from outlines.processors import RegexLogitsProcessor
 
     logits_processor = RegexLogitsProcessor(regex_str, tokenizer=model.tokenizer)
-    return SequenceGeneratorAdapter(model, logits_processor, sampler)
-
-
-@regex.register(LlamaCpp)
-def regex_llamacpp(
-    model: LlamaCpp,
-    regex_str: str,
-    sampler: Sampler = multinomial(),
-):
-    from outlines.integrations.llamacpp import RegexLogitsProcessor
-
-    logits_processor = RegexLogitsProcessor(regex_str, llm=model.model)
     return SequenceGeneratorAdapter(model, logits_processor, sampler)
 
 

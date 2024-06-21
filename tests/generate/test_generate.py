@@ -103,6 +103,17 @@ def test_generate_text_stream(request, model_fixture):
 
 @pytest.mark.parametrize("pattern", REGEX_PATTERNS)
 @pytest.mark.parametrize("model_fixture", ALL_MODEL_FIXTURES)
+def test_generate_fsm(request, model_fixture, pattern):
+    import interegular
+
+    model = request.getfixturevalue(model_fixture)
+    generator = generate.fsm(model, interegular.parse_pattern(pattern).to_fsm())
+    res = generator("test")
+    assert re.fullmatch(pattern, res) is not None, res
+
+
+@pytest.mark.parametrize("pattern", REGEX_PATTERNS)
+@pytest.mark.parametrize("model_fixture", ALL_MODEL_FIXTURES)
 def test_generate_regex(request, model_fixture, pattern):
     model = request.getfixturevalue(model_fixture)
     generator = generate.regex(model, pattern)

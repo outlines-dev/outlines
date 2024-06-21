@@ -141,6 +141,10 @@ class LlamaCpp:
     def __init__(self, model: "Llama"):
         self.model = model
 
+    @property
+    def tokenizer(self):
+        return LlamaCppTokenizer(self.model)
+
     def prepare_generation_parameters(
         self,
         generation_parameters: GenerationParameters,
