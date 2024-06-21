@@ -182,6 +182,10 @@ class Transformers:
 
         return output.logits, output.past_key_values
 
+    @property
+    def device(self):
+        return self.model.device
+
     def __call__(
         self,
         input_ids: "torch.LongTensor",

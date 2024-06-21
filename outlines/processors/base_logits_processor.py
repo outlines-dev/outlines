@@ -42,7 +42,7 @@ class OutlinesLogitsProcessor(Protocol):
         input_ids and logits are always 2D tensors for handling a batch of sequences.
 
         - input_ids -> List[List[tokens]]
-        - logits.shape[0] -> 2D_Tensor[logits]
+        - logits -> 2D_Tensor[logit floats]
 
         Important to keep in mind when designing universal logits processors
         - logits processors are only used once and never re-applied for a new sequence generator
