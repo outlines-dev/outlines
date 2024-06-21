@@ -79,7 +79,7 @@ class OutlinesLogitsProcessor(Protocol):
 
         # Guarantee passed as 2D Tensors, then covert back to original (1D or 2D) shape
         if len(torch_logits.shape) == 2:
-            processed_logits = self.process_logits(input_ids, torch_logits)
+            processed_logits = self.process_logits(input_ids, logits)
         elif len(torch_logits.shape) == 1:
             processed_logits = self.process_logits(
                 [input_ids], torch_logits.unsqueeze(0)

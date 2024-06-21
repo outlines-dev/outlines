@@ -183,6 +183,10 @@ class Transformers:
 
         return output.logits, output.past_key_values
 
+    @property
+    def device(self):
+        return self.model.device
+
     def __call__(
         self,
         input_ids: "torch.LongTensor",
@@ -227,7 +231,6 @@ class Transformers:
             input_ids, attention_mask = self.tokenizer.encode([prompts])
         else:
             input_ids, attention_mask = self.tokenizer.encode(prompts)
-
         inputs = {
             "input_ids": input_ids.to(self.model.device),
             "attention_mask": attention_mask.to(self.model.device),
