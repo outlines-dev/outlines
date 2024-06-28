@@ -65,6 +65,7 @@ class FSMLogitsProcessor(OutlinesLogitsProcessor):
         self.tokenizer = tokenizer
         self._fsm_states: Dict[int, int] = {}
         self.fsm: Guide = fsm
+        self._seq_fsms: List[Guide] = []
         self._is_first_token = True
         self._seq_start_idx: Optional[int] = None
 
@@ -95,22 +96,49 @@ class FSMLogitsProcessor(OutlinesLogitsProcessor):
             sequence_states = [0] * len(input_ids)
 
         else:
-            for seq_ids in input_ids:
+            for i, seq_ids in enumerate(input_ids):
                 prev_state_key = hash(tuple(seq_ids[self._seq_start_idx : -1]))
                 prev_state = self._fsm_states[prev_state_key]
 
                 curr_state_key = hash(tuple(seq_ids[self._seq_start_idx :]))
-                curr_state = self.fsm.get_next_state(prev_state, seq_ids[-1])
+                curr_state = self._seq_fsms[i].get_next_state(prev_state, seq_ids[-1])
 
                 self._fsm_states[curr_state_key] = curr_state
                 sequence_states.append(curr_state)
 
         mask = torch.full_like(logits, -math.inf)
         for i, fsm_state in enumerate(sequence_states):
-            allowed_tokens = self.fsm.get_next_instruction(fsm_state).tokens
+            allowed_tokens = self._seq_fsms[i].get_next_instruction(fsm_state).tokens
             mask[i, allowed_tokens] = logits[i, allowed_tokens]
 
         return mask
+
+    def align_prompts(self, prompts: Union[str, List[str]]) -> Union[str, List[str]]:
+        """Create a distinct fsm for each prompt. Apply prompt alignment to each of them.
+        If applicable, prompt alignment shortens the user prompt and updates the fsm accordingly.
+
+        Parameters
+        ----------
+        prompts
+            The text prompts previded by the user
+
+        Returns
+        -------
+        The initial text prompts after application of prompt alignment
+        """
+        is_input_str = isinstance(prompts, str)
+        if isinstance(prompts, str):
+            prompts = [prompts]
+
+        self._seq_fsms = [self.fsm.copy() for _ in range(len(prompts))]
+        aligned_prompts = [
+            fsm.align_prompt_tokens(prompt)
+            for fsm, prompt in zip(self._seq_fsms, prompts)
+        ]
+
+        if is_input_str:
+            return aligned_prompts[0]
+        return aligned_prompts
 
     def copy(self) -> "FSMLogitsProcessor":
         """Return a copy of the logits processor."""
