@@ -68,6 +68,7 @@ serve = [
     "uvicorn",
     "fastapi",
     "pydantic>=2.0",
+    "typer[all]",
 ]
 
 [project.urls]
@@ -78,6 +79,9 @@ repository = "https://github.com/outlines-dev/outlines"
 [project.readme]
 file="README.md"
 content-type = "text/markdown"
+
+[project.scripts]
+outlines = "outlines.serve.main:main"
 
 [tool.setuptools]
 packages = ["outlines"]
@@ -99,6 +103,9 @@ filterwarnings = [
     "ignore::UserWarning",
     "ignore::DeprecationWarning:pyairports.*",
 ]
+
+[tool.poetry.scripts]
+rick-portal-gun = "rick_portal_gun.main:app"
 
 [tool.mypy]
 exclude=["examples"]
@@ -123,6 +130,7 @@ module = [
     "tiktoken.*",
     "torch.*",
     "transformers.*",
+    "typer.*",
     "llama_cpp",
     "huggingface_hub",
     "lark.*",
