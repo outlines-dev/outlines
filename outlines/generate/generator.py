@@ -76,7 +76,7 @@ def sequence_generator(
             raise ContextLengthExceededError(
                 "The input length exceeds the context length of the model."
             )
-
+        logits = logits.to(model.device)
         allowed_tokens = get_allowed_tokens(fsms, fsm_states)
         biased_logits = bias_logits(logits, allowed_tokens)
         next_token_ids, ancestors, sequence_weights = sampler(
