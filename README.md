@@ -191,10 +191,9 @@ model = outlines.models.transformers("mistralai/Mistral-7B-Instruct-v0.2")
 generator = outlines.generate.json(model, Character)
 
 # Draw a sample
-rng = torch.Generator(device="cuda")
-rng.manual_seed(789001)
+seed = 789001
 
-character = generator("Give me a character description", rng=rng)
+character = generator("Give me a character description", seed=seed)
 
 print(repr(character))
 # Character(name='Anderson', age=28, armor=<Armor.chainmail: 'chainmail'>, weapon=<Weapon.sword: 'sword'>, strength=8)
