@@ -14,19 +14,19 @@ FormattedOutput = Union[
 
 
 class SequenceGenerator:
-    def __init__(
-        self,
-        fsm,
-        model,
-        sampler,
-        device,
-    ):
+    def __init__(self, fsm, model, sampler, device, probabilities=None):
         self.fsm = fsm
         self.model = model
         self.sampler = sampler
         self.tokenizer = model.tokenizer
         self.device = device
         self.num_samples = sampler.samples
+        # The choices for which we want to compute the probabilities
+        self.probabilities = probabilities
+        if self.probabilities:
+            assert isinstance(
+                self.sampler, BeamSearchSampler
+            ), "Probabilities are only supported with a beam search sampler"
 
     def get_generated_token_ids(
         self,
@@ -132,7 +132,9 @@ class SequenceGenerator:
         max_tokens: Optional[int] = None,
         stop_at: Optional[Union[str, List[str]]] = None,
         rng: Optional["torch.Generator"] = None,
-    ) -> Union[FormattedOutput, List[FormattedOutput], List[List[FormattedOutput]]]:
+    ) -> Union[
+        FormattedOutput, List[FormattedOutput], List[List[FormattedOutput]], tuple
+    ]:
         """Generate the full text sequence.
 
         Since `SequenceGenerator.stream` calls the tokenizer at every step this
@@ -231,8 +233,32 @@ class SequenceGenerator:
 
         # We reshape the output to (batch_size, sample_size)
         output: List[List[FormattedOutput]] = list()
+
         for i in range(batch_size):
             output.append(formatted[i : i + num_samples])
+
+        if self.probabilities:
+            logprobs = last_state.weights
+            probs = torch.exp(logprobs)
+            output_probs = [
+                {choice: 0.0 for choice in self.probabilities}
+                for _ in range(batch_size)
+            ]
+            for i in range(batch_size):
+                for choice in self.probabilities:
+                    for output_index, output_item in enumerate(output[i]):
+                        if choice == output_item:
+                            output_probs[i][choice] += float(
+                                probs[i * num_samples + output_index]
+                            )
+            if batch_size == 1 and num_samples == 1:
+                return output[0][0], output_probs[0]
+            elif batch_size == 1:
+                return output[0], output_probs[0]
+            elif num_samples == 1:
+                return [samples[0] for samples in output], output_probs
+            else:
+                return output, output_probs
 
         # We remove leading dimensions for the output
         if batch_size == 1 and num_samples == 1:

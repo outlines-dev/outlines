@@ -261,7 +261,7 @@ class BeamSearchSampler:
         self,
         next_token_logits: "torch.DoubleTensor",
         sequence_weights: "torch.DoubleTensor",
-        _,
+        rng: "torch.Generator",
     ) -> Tuple["torch.DoubleTensor", "torch.DoubleTensor", "torch.DoubleTensor"]:
         """Call the beam search sampler.
 
