@@ -66,17 +66,21 @@ You can run the benchmark test suite locally with the following command:
 asv run --config benchmarks/asv.conf.json
 ```
 
-Run a specific test:
+Caveats:
+- If you're on a device with CUDA, you must add the argument `--launch-method spawn`
+- Uncommitted code will not be benchmarked, you must first commit your changes.
+
+#### Run a specific test:
 ```
 asv run --config benchmarks/asv.conf.json -b bench_json_schema.JsonSchemaBenchmark.time_json_schema_to_fsm
 ```
 
-Profile a specific test:
+#### Profile a specific test:
 ```
 asv run --config benchmarks/asv.conf.json --profile -b bench_json_schema.JsonSchemaBenchmark.time_json_schema_to_fsm
 ```
 
-Compare to `origin/main`
+#### Compare to `origin/main`
 ```
 get fetch origin
 asv continuous origin/main HEAD --config benchmarks/asv.conf.json

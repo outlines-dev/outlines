@@ -3,6 +3,13 @@ import pytest
 from outlines.fsm.guide import CFGGuide, Generate, RegexGuide, StopAtEOSGuide, Write
 
 
+def assert_expected_tensor_ids(tensor, ids):
+    assert len(tensor) == len(ids)
+    norm_tensor = sorted(map(int, tensor))
+    norm_ids = sorted(map(int, tensor))
+    assert norm_tensor == norm_ids, (norm_tensor, norm_ids)
+
+
 def test_stop_at_eos():
     class MockTokenizer:
         vocabulary = {"a": 1, "eos": 2}
@@ -56,7 +63,7 @@ def test_regex():
 
     instruction = fsm.get_next_instruction(0)
     assert isinstance(instruction, Generate)
-    assert instruction.tokens == [1]
+    assert_expected_tensor_ids(instruction.tokens, [1])
 
     assert fsm.get_next_state(state=0, token_id=1) == 1
     assert fsm.get_next_state(state=0, token_id=tokenizer.eos_token_id) == -1
@@ -102,7 +109,7 @@ def test_regex_multi_byte_llama_like():
 
     instruction = fsm.get_next_instruction(0)
     assert isinstance(instruction, Generate)
-    assert instruction.tokens == [5, 4]
+    assert_expected_tensor_ids(instruction.tokens, [5, 4])
 
     assert fsm.get_next_state(state=0, token_id=5) == 1
     assert fsm.get_next_state(state=0, token_id=tokenizer.eos_token_id) == -1
@@ -149,7 +156,7 @@ def test_regex_multi_byte_gpt2_like():
 
     instruction = fsm.get_next_instruction(0)
     assert isinstance(instruction, Generate)
-    assert instruction.tokens == [5, 10]
+    assert_expected_tensor_ids(instruction.tokens, [5, 10])
 
     assert fsm.get_next_state(state=0, token_id=5) == 1
     assert fsm.get_next_state(state=0, token_id=tokenizer.eos_token_id) == -1
@@ -209,35 +216,35 @@ def test_cfg():
 
     instruction = fsm.get_next_instruction(fsm.start_state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 3, 5}
+    assert_expected_tensor_ids(instruction.tokens, [1, 3, 5])
     state = fsm.get_next_state(state=fsm.start_state, token_id=1)
     assert fsm.generation == "{"
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 2, 3}
+    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
     state = fsm.get_next_state(state=state, token_id=3)
     assert fsm.generation == "{["
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 3, 4}
+    assert_expected_tensor_ids(instruction.tokens, [1, 3, 4])
     state = fsm.get_next_state(state=state, token_id=4)
     assert fsm.generation == "{[]"
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {2}
+    assert_expected_tensor_ids(instruction.tokens, [2])
     state = fsm.get_next_state(state=state, token_id=2)
     assert fsm.generation == "{[]}"
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Write)
-    assert set(instruction.tokens) == {5}
+    assert_expected_tensor_ids(instruction.tokens, [5])
     state = fsm.get_next_state(state=state, token_id=5)
     assert fsm.generation == "{[]}"
     assert fsm.is_final_state(state)
@@ -270,14 +277,14 @@ def test_cfg_early_termination():
 
     instruction = fsm.get_next_instruction(fsm.start_state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1}
+    assert_expected_tensor_ids(instruction.tokens, [1])
     state = fsm.get_next_state(state=fsm.start_state, token_id=1)
     assert fsm.generation == "("
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 2}
+    assert_expected_tensor_ids(instruction.tokens, [1, 2])
     state = fsm.get_next_state(state=state, token_id=2)
     assert fsm.generation == "()"
     assert not fsm.is_final_state(state)
@@ -285,7 +292,7 @@ def test_cfg_early_termination():
     # possible to continue or terminate
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 3}
+    assert_expected_tensor_ids(instruction.tokens, [1, 3])
     state = fsm.get_next_state(state=state, token_id=3)  # feed eos
     assert fsm.generation == "()"
     assert fsm.is_final_state(state)
@@ -293,7 +300,7 @@ def test_cfg_early_termination():
     # once eos generated, can only terminate
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Write)
-    assert set(instruction.tokens) == {3}
+    assert_expected_tensor_ids(instruction.tokens, [3])
 
 
 def test_cfg_ignore_directive():
@@ -326,42 +333,42 @@ def test_cfg_ignore_directive():
 
     instruction = fsm.get_next_instruction(0)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 2}
+    assert_expected_tensor_ids(instruction.tokens, [1, 2])
     state = fsm.get_next_state(state=0, token_id=2)
     assert fsm.generation == " "
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(0)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 2}
+    assert_expected_tensor_ids(instruction.tokens, [1, 2])
     state = fsm.get_next_state(state=0, token_id=1)
     assert fsm.generation == " a"
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 2, 3}
+    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
     state = fsm.get_next_state(state=state, token_id=2)
     assert fsm.generation == " a "
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 2, 3}
+    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
     state = fsm.get_next_state(state=state, token_id=2)
     assert fsm.generation == " a  "
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 2, 3}
+    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
     state = fsm.get_next_state(state=state, token_id=1)
     assert fsm.generation == " a  a"
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 2, 3}
+    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
     state = fsm.get_next_state(state=state, token_id=3)
     assert fsm.generation == " a  a"
     assert fsm.is_final_state(state)
@@ -369,7 +376,7 @@ def test_cfg_ignore_directive():
     # once eos generated, can only terminate
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Write)
-    assert set(instruction.tokens) == {3}
+    assert_expected_tensor_ids(instruction.tokens, [3])
 
 
 def test_cfg_multitoken_terminal():
@@ -398,7 +405,7 @@ def test_cfg_multitoken_terminal():
 
     instruction = fsm.get_next_instruction(fsm.start_state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 2}
+    assert_expected_tensor_ids(instruction.tokens, [1, 2])
     assert fsm.reset_state  # starting new regex
     state = fsm.get_next_state(state=fsm.start_state, token_id=1)
     assert fsm.generation == "a"
@@ -406,7 +413,7 @@ def test_cfg_multitoken_terminal():
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1}
+    assert_expected_tensor_ids(instruction.tokens, [1])
     assert not fsm.reset_state  # continuing current regex
     state = fsm.get_next_state(state=state, token_id=1)
     assert fsm.generation == "aa"
@@ -414,7 +421,7 @@ def test_cfg_multitoken_terminal():
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Write)
-    assert set(instruction.tokens) == {3}
+    assert_expected_tensor_ids(instruction.tokens, [3])
     assert not fsm.reset_state  # completing current regex
     state = fsm.get_next_state(state=state, token_id=3)
     assert fsm.generation == "aa"
@@ -447,35 +454,35 @@ def test_cfg_allow_both_extend_and_shift_terminal():
 
     instruction = fsm.get_next_instruction(fsm.start_state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 3}
+    assert_expected_tensor_ids(instruction.tokens, [1, 3])
     state = fsm.get_next_state(state=fsm.start_state, token_id=1)
     assert fsm.generation == "("
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {1, 3}
+    assert_expected_tensor_ids(instruction.tokens, [1, 3])
     state = fsm.get_next_state(state=state, token_id=3)
     assert fsm.generation == "(a"
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {2, 3}
+    assert_expected_tensor_ids(instruction.tokens, [2, 3])
     state = fsm.get_next_state(state=state, token_id=3)
     assert fsm.generation == "(aa"
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Generate)
-    assert set(instruction.tokens) == {2, 3}
+    assert_expected_tensor_ids(instruction.tokens, [2, 3])
     state = fsm.get_next_state(state=state, token_id=2)
     assert fsm.generation == "(aa)"
     assert not fsm.is_final_state(state)
 
     instruction = fsm.get_next_instruction(state)
     assert isinstance(instruction, Write)
-    assert set(instruction.tokens) == {4}
+    assert_expected_tensor_ids(instruction.tokens, [4])
     state = fsm.get_next_state(state=state, token_id=4)
     assert fsm.generation == "(aa)"
     assert fsm.is_final_state(state)

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, List, Optional, Protocol, Tuple, Union
 
 import interegular
+import torch
 from lark import Lark
 
 from outlines import grammars
@@ -146,6 +147,13 @@ class RegexGuide(Guide):
         self.eos_token_id = tokenizer.eos_token_id
         self.final_states = fsm_finals | {-1}
 
+        # cache returned masks token masks
+        # this increases performance of the mask substantially
+        self.states_to_token_mask = {
+            state: torch.tensor(list(next_tokens_to_end_states.keys()))
+            for state, next_tokens_to_end_states in self.states_to_token_maps.items()
+        }
+
     def get_next_instruction(self, state: int) -> Instruction:
         """Return the next instruction for guided generation.
 
@@ -169,11 +177,11 @@ class RegexGuide(Guide):
         A `Generate` instance that contains the model and the allowed token ids.
 
         """
-        next_tokens_to_end_states = self.states_to_token_maps.get(state)
-        if next_tokens_to_end_states is None:
-            return Write([self.eos_token_id])
+        next_tokens_mask = self.states_to_token_mask.get(state)
+        if next_tokens_mask is None:
+            return Write(torch.tensor([self.eos_token_id]))
 
-        return Generate(list(next_tokens_to_end_states.keys()))
+        return Generate(next_tokens_mask)
 
     def get_next_state(self, state: int, token_id: int) -> int:
         """Update the state of the guide.
