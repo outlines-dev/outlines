@@ -320,6 +320,21 @@ def test_transformers_integration_choice():
     assert sequence == "test" or sequence == "choice"
 
 
+def test_transformers_integration_probabilities():
+    rng = torch.Generator()
+    rng.manual_seed(0)
+
+    model_name = "hf-internal-testing/tiny-random-GPTJForCausalLM"
+    model = models.transformers(model_name, device="cpu")
+    prompt = "Write a short sentence "
+    sequence, probs = generate.probabilities(
+        model, ["test", "choice"], sampler=beam_search(beams=5)
+    )(prompt, rng=rng)
+    assert probs.keys() == {"test", "choice"}
+    assert probs["test"] > 0
+    assert probs["choice"] > 0
+
+
 def test_transformers_integration_with_pad_token():
     model_name = "hf-internal-testing/tiny-random-XLMRobertaXLForCausalLM"
     model = models.transformers(model_name, device="meta")
