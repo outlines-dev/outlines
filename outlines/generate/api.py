@@ -1,4 +1,5 @@
 import datetime
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterator, List, Optional, Union
 
@@ -20,6 +21,7 @@ class SequenceGenerator:
         model,
         sampler,
         device,
+        apply_chat_template: bool = True,
     ):
         self.fsm = fsm
         self.model = model
@@ -27,6 +29,7 @@ class SequenceGenerator:
         self.tokenizer = model.tokenizer
         self.device = device
         self.num_samples = sampler.samples
+        self.apply_chat_template = apply_chat_template
 
     def get_generated_token_ids(
         self,
@@ -132,6 +135,7 @@ class SequenceGenerator:
         max_tokens: Optional[int] = None,
         stop_at: Optional[Union[str, List[str]]] = None,
         rng: Optional["torch.Generator"] = None,
+        apply_chat_template: Optional[bool] = None,
     ) -> Union[FormattedOutput, List[FormattedOutput], List[List[FormattedOutput]]]:
         """Generate the full text sequence.
 
@@ -153,15 +157,24 @@ class SequenceGenerator:
         rng
             The random number generator. Defaults to a non-seeded `torch.Generator`
             instance.
+        apply_chat_template
+            Whether to apply the chat template to the prompts. Defaults to the value
+            set at init. Only applies to `TransformerTokenizer` for now.
 
         Returns
         -------
         The generation(s), potentially cast to another type.
         """
+        if apply_chat_template is None:
+            apply_chat_template = self.apply_chat_template
+
         import torch
 
         if isinstance(prompts, str):
             prompts = [prompts]
+
+        if apply_chat_template:
+            apply_chat_template_util(self.model, prompts)
 
         if isinstance(stop_at, str):
             stop_at = [stop_at]
@@ -250,6 +263,7 @@ class SequenceGenerator:
         max_tokens: Optional[int] = None,
         stop_at: Optional[Union[str, List[str]]] = None,
         rng: Optional["torch.Generator"] = None,
+        apply_chat_template: Optional[bool] = None,
     ) -> Iterator[Union[List[str], str, List[List[str]]]]:
         """Generate the text sequence one token at a time.
 
@@ -270,16 +284,25 @@ class SequenceGenerator:
         rng
             The random number generator. Defaults to a non-seeded `torch.Generator`
             instance.
+        apply_chat_template
+            Whether to apply the chat template to the prompts. Defaults to the value
+            set at init. Only applies to `TransformerTokenizer` for now.
 
         Returns
         -------
         A string or list of strings that contain the generated text.
 
         """
+        if apply_chat_template is None:
+            apply_chat_template = self.apply_chat_template
+
         import torch
 
         if isinstance(prompts, str):
             prompts = [prompts]
+
+        if apply_chat_template:
+            apply_chat_template_util(self.model, prompts)
 
         if isinstance(stop_at, str):
             stop_at = [stop_at]
@@ -423,7 +446,9 @@ class SequenceGeneratorAdapter:
 
     """
 
-    def __init__(self, model, logits_processor, sampler):
+    def __init__(
+        self, model, logits_processor, sampler, apply_chat_template: bool = True
+    ):
         self.model = model
         self.logits_processor = logits_processor
 
@@ -443,6 +468,8 @@ class SequenceGeneratorAdapter:
             self.sampling_params = SamplingParameters(
                 "beam_search", sampler.samples, None, None, 1.0
             )
+
+        self.apply_chat_template = apply_chat_template
 
     def prepare_generation_parameters(
         self,
@@ -485,9 +512,15 @@ class SequenceGeneratorAdapter:
         max_tokens: Optional[int] = None,
         stop_at: Optional[Union[str, List[str]]] = None,
         seed: Optional[int] = None,
+        apply_chat_template: Optional[bool] = None,
         **model_specific_params,
     ):
         """Generate text from a prompt of list of prompts."""
+        if apply_chat_template is None:
+            apply_chat_template = self.apply_chat_template
+
+        if apply_chat_template:
+            apply_chat_template_util(self.model, prompts)
 
         def format(sequences):
             """Apply formatting to every string in a completion."""
@@ -516,9 +549,14 @@ class SequenceGeneratorAdapter:
         max_tokens: Optional[int] = None,
         stop_at: Optional[Union[str, List[str]]] = None,
         seed: Optional[int] = None,
+        apply_chat_template: Optional[bool] = None,
         **model_specific_params,
     ):
         """Return a text generator from a prompt or a list of prompts."""
+        if apply_chat_template is None:
+            apply_chat_template = self.apply_chat_template
+        if apply_chat_template:
+            apply_chat_template_util(self.model, prompts)
         generation_params = self.prepare_generation_parameters(
             max_tokens, stop_at, seed
         )
@@ -529,3 +567,22 @@ class SequenceGeneratorAdapter:
             self.sampling_params,
             **model_specific_params,
         )
+
+
+def apply_chat_template_util(model, prompts: Union[str, List[str]]) -> List[str]:
+    from outlines.models.transformers import TransformerTokenizer
+
+    if isinstance(prompts, str):
+        prompts = [prompts]
+    if not isinstance(model.tokenizer, TransformerTokenizer):
+        warnings.warn(
+            "Chat template is only supported for `Transformer` models for now. The raw prompts will be used instead."
+        )
+        return prompts
+    tokenizer: "TransformerTokenizer" = model.tokenizer
+    if getattr(tokenizer.tokenizer, "chat_template", None) is None:
+        warnings.warn(
+            "The model does not have chat template support. The raw prompts will be used instead. To turn this warning off, either explicitly set the `apply_chat_template` argument to 'False' or assign a value to `model.tokenizer.tokenizer.chat_template`."
+        )
+        return prompts
+    return [tokenizer.apply_chat_template(prompt) for prompt in prompts]

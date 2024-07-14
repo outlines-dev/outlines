@@ -7,7 +7,9 @@ from outlines.samplers import Sampler, multinomial
 
 
 @singledispatch
-def text(model, sampler: Sampler = multinomial()) -> SequenceGenerator:
+def text(
+    model, sampler: Sampler = multinomial(), apply_chat_template: bool = True
+) -> SequenceGenerator:
     """Generate text with a `Transformer` model.
 
     Note
@@ -31,24 +33,28 @@ def text(model, sampler: Sampler = multinomial()) -> SequenceGenerator:
     """
     fsm = StopAtEOSGuide(model.tokenizer)
     device = model.device
-    generator = SequenceGenerator(fsm, model, sampler, device)
+    generator = SequenceGenerator(fsm, model, sampler, device, apply_chat_template)
 
     return generator
 
 
 @text.register(MLXLM)
-def text_mlxlm(model: MLXLM, sampler: Sampler = multinomial()):
-    return SequenceGeneratorAdapter(model, None, sampler)
+def text_mlxlm(
+    model: MLXLM, sampler: Sampler = multinomial(), apply_chat_template: bool = True
+):
+    return SequenceGeneratorAdapter(model, None, sampler, apply_chat_template)
 
 
 @text.register(VLLM)
-def text_vllm(model: VLLM, sampler: Sampler = multinomial()):
-    return SequenceGeneratorAdapter(model, None, sampler)
+def text_vllm(
+    model: VLLM, sampler: Sampler = multinomial(), apply_chat_template: bool = True
+):
+    return SequenceGeneratorAdapter(model, None, sampler, apply_chat_template)
 
 
 @text.register(LlamaCpp)
 def text_llamacpp(model: LlamaCpp, sampler: Sampler = multinomial()):
-    return SequenceGeneratorAdapter(model, None, sampler)
+    return SequenceGeneratorAdapter(model, None, sampler, apply_chat_template=False)
 
 
 @text.register(OpenAI)

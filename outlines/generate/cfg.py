@@ -10,7 +10,12 @@ from outlines.samplers import Sampler, multinomial
 
 
 @singledispatch
-def cfg(model, cfg_str: str, sampler: Sampler = multinomial()) -> SequenceGenerator:
+def cfg(
+    model,
+    cfg_str: str,
+    sampler: Sampler = multinomial(),
+    apply_chat_template: bool = True,
+) -> SequenceGenerator:
     """Generate text in the language of a Context-Free Grammar
 
     Arguments
@@ -29,7 +34,7 @@ def cfg(model, cfg_str: str, sampler: Sampler = multinomial()) -> SequenceGenera
     """
     fsm = CFGGuide(cfg_str, model.tokenizer)
     device = model.device
-    generator = SequenceGenerator(fsm, model, sampler, device)
+    generator = SequenceGenerator(fsm, model, sampler, device, apply_chat_template)
 
     return generator
 
@@ -40,6 +45,7 @@ def cfg_unimplemented(
     model,
     cfg_str: str,
     sampler: Sampler = multinomial(),
+    apply_chat_template: bool = True,
 ):
     raise NotImplementedError(
         f"The CFG Logits processor is not available for {type(model)}."
@@ -55,7 +61,9 @@ def cfg_llamacpp(
     from outlines.integrations.llamacpp import CFGLogitsProcessor
 
     logits_processor = CFGLogitsProcessor(cfg_str, model.model)
-    return SequenceGeneratorAdapter(model, logits_processor, sampler)
+    return SequenceGeneratorAdapter(
+        model, logits_processor, sampler, apply_chat_template=False
+    )
 
 
 @cfg.register(OpenAI)

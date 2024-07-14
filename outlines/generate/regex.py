@@ -10,7 +10,12 @@ from outlines.samplers import Sampler, multinomial
 
 
 @singledispatch
-def regex(model, regex_str: str, sampler: Sampler = multinomial()):
+def regex(
+    model,
+    regex_str: str,
+    sampler: Sampler = multinomial(),
+    apply_chat_template: bool = True,
+):
     """Generate structured text in the language of a regular expression.
 
     Parameters
@@ -33,7 +38,7 @@ def regex(model, regex_str: str, sampler: Sampler = multinomial()):
     fsm = RegexGuide(regex_str, model.tokenizer)
 
     device = model.device
-    generator = SequenceGenerator(fsm, model, sampler, device)
+    generator = SequenceGenerator(fsm, model, sampler, device, apply_chat_template)
 
     return generator
 
@@ -43,11 +48,14 @@ def regex_mlxlm(
     model: MLXLM,
     regex_str: str,
     sampler: Sampler = multinomial(),
+    apply_chat_template: bool = True,
 ):
     from outlines.processors import RegexLogitsProcessor
 
     logits_processor = RegexLogitsProcessor(regex_str, tokenizer=model.tokenizer)
-    return SequenceGeneratorAdapter(model, logits_processor, sampler)
+    return SequenceGeneratorAdapter(
+        model, logits_processor, sampler, apply_chat_template
+    )
 
 
 @regex.register(LlamaCpp)
@@ -59,7 +67,9 @@ def regex_llamacpp(
     from outlines.integrations.llamacpp import RegexLogitsProcessor
 
     logits_processor = RegexLogitsProcessor(regex_str, llm=model.model)
-    return SequenceGeneratorAdapter(model, logits_processor, sampler)
+    return SequenceGeneratorAdapter(
+        model, logits_processor, sampler, apply_chat_template=False
+    )
 
 
 @regex.register(VLLM)
@@ -67,11 +77,14 @@ def regex_vllm(
     model: VLLM,
     regex_str: str,
     sampler: Sampler = multinomial(),
+    apply_chat_template: bool = True,
 ):
     from outlines.integrations.vllm import RegexLogitsProcessor
 
     logits_processor = RegexLogitsProcessor(regex_str, model.model)
-    return SequenceGeneratorAdapter(model, logits_processor, sampler)
+    return SequenceGeneratorAdapter(
+        model, logits_processor, sampler, apply_chat_template
+    )
 
 
 @regex.register(OpenAI)
