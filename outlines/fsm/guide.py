@@ -71,6 +71,8 @@ class Guide(Protocol):
 
     """
 
+    final_state: int = -1
+
     def get_next_instruction(self, state: int) -> Instruction:
         ...
 
@@ -90,7 +92,6 @@ class Guide(Protocol):
 class StopAtEOSGuide(Guide):
     """Guide to generate tokens until the EOS token has been generated."""
 
-    final_state = -1
     start_state = 0
 
     def __init__(self, tokenizer: "Tokenizer"):
