@@ -1,3 +1,5 @@
+from collections import defaultdict
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -78,6 +80,9 @@ class Guide(Protocol):
     def is_final_state(self, state: int) -> bool:
         ...
 
+    def align_prompt_tokens(self, prompt: str, tokenizer: "Tokenizer") -> str:
+        ...
+
     def copy(self) -> "Guide":
         ...
 
@@ -85,7 +90,7 @@ class Guide(Protocol):
 class StopAtEOSGuide(Guide):
     """Guide to generate tokens until the EOS token has been generated."""
 
-    final_state = 1
+    final_state = -1
     start_state = 0
 
     def __init__(self, tokenizer: "Tokenizer"):
@@ -96,24 +101,69 @@ class StopAtEOSGuide(Guide):
 
         """
         self.eos_token_id = tokenizer.eos_token_id
-        self.vocabulary = tokenizer.vocabulary.values()
+        self.vocabulary = tokenizer.vocabulary
+        self.states_to_token_maps = self.create_states_to_tokens_map()
+
+    def create_states_to_tokens_map(self) -> Dict[int, Dict[int, int]]:
+        """Create the states_to_tokens_map. All tokens lead to the starting
+        state, except for the eos_token that leads to the final state."""
+        return {
+            self.start_state: {
+                token_id: self.start_state
+                if token_id != self.eos_token_id
+                else self.final_state
+                for token_id in self.vocabulary.values()
+            }
+        }
+
+    def align_prompt_tokens(self, prompt: str, tokenizer: "Tokenizer") -> str:
+        """Update the states_to_token_maps and return the aligned prompt"""
+        token_ids, _ = tokenizer.encode(prompt)
+        # possible return types of tokenizers include list, 1d Tensor and 2d Tensor
+        if not isinstance(token_ids, list):
+            token_ids = token_ids.tolist()
+            if isinstance(token_ids[0], list):
+                token_ids = token_ids[0]
+        (
+            aligned_token_ids,
+            aligned_states_to_token_maps,
+        ) = align_tokens_states_to_token_maps(
+            token_ids, self.vocabulary, deepcopy(self.states_to_token_maps)
+        )
+        # some tokenizer expect a list of lists while others expect a simple list
+        aligned_prompt: list
+        try:
+            aligned_prompt = tokenizer.decode([aligned_token_ids])
+        except TypeError:
+            aligned_prompt = tokenizer.decode(aligned_token_ids)
+        # some models do not accept an empty string as a prompt
+        # if token alignement would remove all tokens, do not apply it
+        if not aligned_prompt or not aligned_prompt[0]:
+            return prompt
+        aligned_prompt = aligned_prompt[0]
+        print(prompt, token_ids, aligned_token_ids, aligned_prompt)
+        self.states_to_token_maps = aligned_states_to_token_maps
+        # remove leading whitespace if added by the tokenizer
+        if aligned_prompt[0] == " " and prompt[0] != " ":
+            return aligned_prompt[1:]
+        return aligned_prompt
 
     def get_next_instruction(self, state: int) -> Instruction:
         if self.is_final_state(state):
             return Write([self.eos_token_id])
-        return Generate(None)
+        return Generate(list(self.states_to_token_maps[state].keys()))
 
     def get_next_state(self, state: int, token_id: int) -> int:
-        if token_id == self.eos_token_id or state == self.final_state:
+        if self.is_final_state(state):
             return self.final_state
 
-        return self.start_state
+        return self.states_to_token_maps[state][token_id]
 
     def is_final_state(self, state: int):
         return state == self.final_state
 
     def copy(self):
-        return self
+        return deepcopy(self)
 
 
 @cache()
@@ -182,9 +232,41 @@ class RegexGuide(Guide):
             self.empty_token_ids,
             fsm_finals,
         ) = create_states_mapping(regex_string, tokenizer)
+        self._cache_state_to_token_tensor()
+        self.vocabulary = tokenizer.vocabulary
         self.eos_token_id = tokenizer.eos_token_id
         self.final_states = fsm_finals | {-1}
+
+    def align_prompt_tokens(self, prompt: str, tokenizer: "Tokenizer") -> str:
+        """Update the states_to_token_maps and return the aligned prompt"""
+        token_ids, _ = tokenizer.encode(prompt)
+        # possible return types of tokenizers include list, 1d Tensor and 2d Tensor
+        if not isinstance(token_ids, list):
+            token_ids = token_ids.tolist()
+            if isinstance(token_ids[0], list):
+                token_ids = token_ids[0]
+        (
+            aligned_token_ids,
+            aligned_states_to_token_maps,
+        ) = align_tokens_states_to_token_maps(
+            token_ids, self.vocabulary, deepcopy(self.states_to_token_maps)
+        )
+        # some tokenizer expect a list of lists while others expect a simple list
+        aligned_prompt: str
+        try:
+            aligned_prompt = tokenizer.decode([aligned_token_ids])[0]
+        except TypeError:
+            aligned_prompt = tokenizer.decode(aligned_token_ids)[0]
+        # some models do not accept an empty string as a prompt
+        # if token alignement would remove all tokens, do not apply it
+        if not aligned_prompt:
+            return prompt
+        self.states_to_token_maps = aligned_states_to_token_maps
         self._cache_state_to_token_tensor()
+        # remove leading whitespace if added by the tokenizer
+        if aligned_prompt[0] == " " and prompt[0] != " ":
+            return aligned_prompt[1:]
+        return aligned_prompt
 
     def get_next_instruction(self, state: int) -> Instruction:
         """Return the next instruction for guided generation.
@@ -278,6 +360,7 @@ class RegexGuide(Guide):
             from_interegular_instance.states_to_token_maps,
             from_interegular_instance.empty_token_ids,
         ) = create_states_mapping_from_interegular_fsm(interegular_fsm)
+        from_interegular_instance.vocabulary = tokenizer.vocabulary
         from_interegular_instance.eos_token_id = tokenizer.eos_token_id
         from_interegular_instance._cache_state_to_token_tensor()
         return from_interegular_instance
@@ -297,7 +380,7 @@ class RegexGuide(Guide):
         return state in self.final_states
 
     def copy(self):
-        return self
+        return deepcopy(self)
 
 
 class CFGGuide(Guide):
@@ -333,6 +416,10 @@ class CFGGuide(Guide):
 
         self.start_state = 0
         self.final_state = -1
+
+    def align_prompt_tokens(self, prompt: str, tokenizer: "Tokenizer") -> str:
+        """Not applicable to this type of Guide"""
+        return prompt
 
     def get_next_instruction(self, state: int) -> Instruction:
         """Generate an instruction for the next step.
@@ -475,3 +562,160 @@ class CFGGuide(Guide):
     def copy(self) -> "CFGGuide":
         """Create a copy of the FSM."""
         return CFGGuide(self.cfg_string, self.tokenizer)
+
+
+def align_tokens_states_to_token_maps(
+    token_ids: List[int],
+    vocabulary: Dict[str, int],
+    states_to_token_maps: Dict[int, Dict[int, int]],
+) -> Tuple[List[int], Dict[int, Dict[int, int]]]:
+    """Apply token alignment to the provided prompt tokens and attention masks given the
+    states_to_token_maps of a FSM. Return the updated tokens/maps as well as the updated
+    states_to_token_maps"""
+    crossing_tokens = find_crossing_tokens(token_ids, vocabulary)
+    valid_crossing_tokens = get_crossing_tokens_target_states(
+        states_to_token_maps, crossing_tokens, token_ids, vocabulary
+    )
+    if not valid_crossing_tokens:
+        return token_ids, states_to_token_maps
+    (
+        states_to_token_maps,
+        number_cropped_tokens,
+    ) = add_crossing_tokens_states_to_tokens_map(
+        states_to_token_maps, token_ids, valid_crossing_tokens
+    )
+    return (
+        token_ids[:-number_cropped_tokens],
+        states_to_token_maps,
+    )
+
+
+def find_crossing_tokens(
+    token_ids: List[int], vocabulary: Dict[str, int]
+) -> Dict[int, List[int]]:
+    """Find the tokens that could replace one or more tokens at the end of token_ids
+    while conserving the same intial text (and extending it by at least one character).
+    Return a dictionary with, for the indexes in the token_ids with matches, the associated crossing tokens.
+    """
+    reversed_vocabulary = {value: key for key, value in vocabulary.items()}
+    len_token_ids = len(token_ids)
+    max_length_token_text = max(len(item) for item in vocabulary.keys())
+    characters_considered = ""
+    crossing_tokens_map = {}
+
+    for index, token_id in enumerate(reversed(token_ids)):
+        characters_considered = reversed_vocabulary[token_id] + characters_considered
+        if len(characters_considered) >= max_length_token_text:
+            break
+        crossing_token_ids = [
+            token_id
+            for text, token_id in vocabulary.items()
+            if text.startswith(characters_considered)
+            and len(text) > len(characters_considered)
+        ]
+        if crossing_token_ids:
+            crossing_tokens_map[len_token_ids - index - 1] = crossing_token_ids
+
+    return crossing_tokens_map
+
+
+def get_crossing_tokens_target_states(
+    states_to_tokens_map: Dict[int, Dict[int, int]],
+    crossing_tokens: Dict[int, List[int]],
+    prompt_token_ids: List[int],
+    vocabulary: Dict[str, int],
+) -> Dict[int, Dict[int, int]]:
+    """For each crossing token associated to an index, check that the characters after the boundary
+    match the states_to_tokens_map and find the state it would lead to. Return a dict with, for each
+    provided indexes, the associated valid tokens with the state they would lead to.
+    """
+    reversed_vocabulary = {value: key for key, value in vocabulary.items()}
+    prompt_token_texts = [
+        reversed_vocabulary[token_id] for token_id in prompt_token_ids
+    ]
+
+    valid_crossing_tokens: Dict[int, Dict[int, int]] = defaultdict(dict)
+    for pos, tokens in crossing_tokens.items():
+        for token in tokens:
+            is_valid = True
+            characters = reversed_vocabulary[token]
+            characters_before_border = "".join(prompt_token_texts[pos:])
+            characters_after_border = characters[len(characters_before_border) :]
+            state = 0
+            for char in characters_after_border:
+                char_token = vocabulary.get(char)
+                try:
+                    state = states_to_tokens_map[state][char_token]  # type: ignore
+                except KeyError:
+                    is_valid = False
+                    break
+            if is_valid:
+                valid_crossing_tokens[pos][token] = state
+
+    return valid_crossing_tokens
+
+
+def add_crossing_tokens_states_to_tokens_map(
+    states_to_tokens_map: Dict[int, Dict[int, int]],
+    prompt_token_ids: List[int],
+    crossing_tokens_map: Dict[int, Dict[int, int]],
+) -> Tuple[Dict[int, Dict[int, int]], int]:
+    """Modify the states_to_tokens_map to account for the crossing tokens. This operation modifies
+    the starting state of the fsm as we would include some characters at the end of the prompt in
+    the states_to_tokens_map.
+    Attention! the starting state of the states_to_tokens_map provided must be 0.
+    Return the updated states_to_tokens_map and the number of cropped tokens/additional states
+    """
+    if not crossing_tokens_map:
+        return states_to_tokens_map, 0
+    first_crossing_token_pos = min(
+        [key for key, value in crossing_tokens_map.items() if value]
+    )
+    number_additional_states = len(prompt_token_ids) - first_crossing_token_pos
+    highest_state = max(
+        max(states_to_tokens_map.keys()),
+        max(max(items.values()) for items in states_to_tokens_map.values()),
+    )
+
+    for i in range(number_additional_states):
+        # add the tokens that was originally part of the prompt
+        if i == number_additional_states - 1:
+            states_to_tokens_map[highest_state + 1 + i] = {
+                prompt_token_ids[first_crossing_token_pos + i]: 0
+            }
+        else:
+            states_to_tokens_map[highest_state + 1 + i] = {
+                prompt_token_ids[first_crossing_token_pos + i]: highest_state + 2 + i
+            }
+        # add the crossing tokens
+        crossing_tokens = crossing_tokens_map.get(first_crossing_token_pos + i)
+        if crossing_tokens:
+            for token, target_state in crossing_tokens.items():
+                states_to_tokens_map[highest_state + 1 + i][token] = target_state
+
+    # set the id of our new initial state to 0
+    states_to_tokens_map = swap_state_ids_states_to_tokens_map(
+        states_to_tokens_map, highest_state + 1, 0
+    )
+    return states_to_tokens_map, number_additional_states
+
+
+def swap_state_ids_states_to_tokens_map(
+    states_to_tokens_map: Dict[int, Dict[int, int]],
+    first_state_id: int,
+    second_state_id: int,
+) -> Dict[int, Dict[int, int]]:
+    """Swap the id of two states of the states_to_tokens_map while conserving all transitions"""
+    first_state_transitions = states_to_tokens_map.pop(first_state_id)
+    second_state_transitions = states_to_tokens_map.pop(second_state_id)
+    states_to_tokens_map[first_state_id] = second_state_transitions
+    states_to_tokens_map[second_state_id] = first_state_transitions
+
+    for transitions in states_to_tokens_map.values():
+        for token, target_state_id in list(transitions.items()):
+            if target_state_id == first_state_id:
+                transitions[token] = second_state_id
+            elif target_state_id == second_state_id:
+                transitions[token] = first_state_id
+
+    return states_to_tokens_map
