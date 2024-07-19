@@ -18,7 +18,7 @@ def test_stop_at_eos():
     with pytest.warns(UserWarning):
         fsm = StopAtEosFSM(MockTokenizer())
 
-    assert fsm.allowed_token_ids(fsm.start_state) is None
+    assert fsm.allowed_token_ids(fsm.start_state) == [1, 2]
     assert fsm.allowed_token_ids(fsm.final_state) == [2]
     assert fsm.next_state(fsm.start_state, 2) == fsm.final_state
     assert fsm.next_state(fsm.start_state, 1) == fsm.start_state

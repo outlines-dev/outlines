@@ -32,16 +32,18 @@ from typing import TYPE_CHECKING, DefaultDict, Dict, List, Optional, Type, Union
 import torch
 from pydantic import BaseModel
 
-from outlines.fsm.guide import RegexGuide
+from outlines.fsm.guide import Guide, RegexGuide, StopAtEOSGuide
 from outlines.fsm.json_schema import build_regex_from_schema
 from outlines.integrations.utils import adapt_tokenizer, convert_json_schema_to_str
 
 if TYPE_CHECKING:
     from vllm import LLM
 
+    from outlines.models.tokenizer import Tokenizer
 
-class RegexLogitsProcessor:
-    """Bias vLLM generation based on a regular expression.
+
+class FSMLogitsProcessor:
+    """Bias vLLM generation based on a FSM.
 
     Attributes
     ----------
@@ -49,22 +51,22 @@ class RegexLogitsProcessor:
         The finite state machine which is used to bias the logits.
     """
 
-    def __init__(self, regex_string: str, llm: "LLM"):
+    def __init__(self, fsm: Guide):
         """Compile the FSM that drives the regex-structured generation.
 
         Parameters
         ----------
-        regex_string
-            A string that represents a regular expression.
-        llm
-            The vLLM model.
+        fsm
+            Guide.
 
-        Raises
-        ------
-        ValueError
-            If the provided LLM instance in `RegexLogitsProcessor` neither has a
-            `tokenizer` attribute or a `get_tokenizer` method.
         """
+        self.fsm = fsm
+        self.mask_cache: Dict[int, torch.Tensor] = {}
+        self._fsm_state: DefaultDict[int, int] = defaultdict(int)
+
+    @staticmethod
+    def get_llm_tokenizer(llm: "LLM") -> "Tokenizer":
+        """Give the tokenizer attached to the LLM provided"""
         if hasattr(llm, "get_tokenizer"):
             tokenizer = llm.get_tokenizer()
         elif hasattr(llm, "tokenizer"):
@@ -74,13 +76,10 @@ class RegexLogitsProcessor:
                 tokenizer = llm.tokenizer
         else:
             raise ValueError(
-                "The provided LLM instance in `RegexLogitsProcessor` neither has a "
+                "The provided LLM instance in `FSMLogitsProcessor` neither has a "
                 "`tokenizer` attribute or a `get_tokenizer` method."
             )
-        tokenizer = adapt_tokenizer(tokenizer=tokenizer)
-        self.mask_cache: Dict[int, torch.Tensor] = {}
-        self.fsm = RegexGuide(regex_string, tokenizer)
-        self._fsm_state: DefaultDict[int, int] = defaultdict(int)
+        return adapt_tokenizer(tokenizer=tokenizer)
 
     def __call__(self, input_ids: List[int], scores: torch.Tensor) -> torch.Tensor:
         """Use the FSM to bias the logits before sampling the next token.
@@ -123,6 +122,64 @@ class RegexLogitsProcessor:
         biased_scores = scores + mask
 
         return biased_scores
+
+
+class TextLogitsProcessor(FSMLogitsProcessor):
+    """Bias vLLM generation for free text (required because of prompt alignment).
+
+    Attributes
+    ----------
+    fsm
+        The finite state machine which is used to bias the logits.
+    """
+
+    def __init__(self, llm: "LLM"):
+        """Compile the FSM that drives the regex-structured generation.
+
+        Parameters
+        ----------
+        llm
+            The vLLM model.
+
+        Raises
+        ------
+        ValueError
+            If the provided LLM instance in `TextLogitsProcessor` neither has a
+            `tokenizer` attribute or a `get_tokenizer` method.
+        """
+        tokenizer = self.get_llm_tokenizer(llm)
+        fsm = StopAtEOSGuide(tokenizer)
+        super().__init__(fsm=fsm)
+
+
+class RegexLogitsProcessor(FSMLogitsProcessor):
+    """Bias vLLM generation based on a regular expression.
+
+    Attributes
+    ----------
+    fsm
+        The finite state machine which is used to bias the logits.
+    """
+
+    def __init__(self, regex_string: str, llm: "LLM"):
+        """Compile the FSM that drives the regex-structured generation.
+
+        Parameters
+        ----------
+        regex_string
+            A string that represents a regular expression.
+        llm
+            The vLLM model.
+
+        Raises
+        ------
+        ValueError
+            If the provided LLM instance in `RegexLogitsProcessor` neither has a
+            `tokenizer` attribute or a `get_tokenizer` method.
+        """
+        tokenizer = self.get_llm_tokenizer(llm)
+        fsm = RegexGuide(regex_string, tokenizer)
+        super().__init__(fsm=fsm)
 
 
 class JSONLogitsProcessor(RegexLogitsProcessor):

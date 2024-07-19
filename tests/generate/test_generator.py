@@ -21,6 +21,9 @@ def test_sequence_generator_class():
     class MockFSM:
         first_state = 0
 
+        def align_prompt_tokens(self, prompt):
+            return prompt
+
         def get_next_state(self, state, next_token_ids):
             return 4
 
@@ -39,7 +42,7 @@ def test_sequence_generator_class():
             return torch.tensor([[0, 1, 2, 3]]), torch.tensor([[1, 1, 1, 1]])
 
         def decode(self, tokens):
-            return ["testx"[i] for i in tokens]
+            return ["".join(["testx"[int(i)] for i in tokens[0]])]
 
     class MockModel:
         def __init__(self):
@@ -77,6 +80,9 @@ def test_sequence_generator_class():
 
 def test_sequence_generator_1d_single_iteration():
     class MockFSM:
+        def align_prompt_tokens(self, prompt):
+            return prompt
+
         def get_next_state(self, state, next_token_ids):
             return 0
 
@@ -132,6 +138,9 @@ def test_sequence_generator_1d_single_iteration():
 
 def test_sequence_generator_1d_several_iterations():
     class MockFSM:
+        def align_prompt_tokens(self, prompt):
+            return prompt
+
         def get_next_state(self, state, next_token_ids):
             return state + 1
 
@@ -194,6 +203,9 @@ def test_sequence_generator_1d_several_iterations():
 
 def test_sequence_generator_2d_single_iteration():
     class MockFSM:
+        def align_prompt_tokens(self, prompt):
+            return prompt
+
         def get_next_state(self, state, next_token_ids):
             return 0
 
@@ -260,6 +272,9 @@ def test_sequence_generator_2d_single_iteration():
 
 def test_sequence_generator_2d_several_iterations():
     class MockFSM:
+        def align_prompt_tokens(self, prompt):
+            return prompt
+
         def get_next_state(self, state, next_token_ids):
             return state + 1
 

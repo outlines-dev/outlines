@@ -40,12 +40,18 @@ def text(model, sampler: Sampler = multinomial()) -> SequenceGenerator:
 @text.register(Transformers)
 @text.register(LlamaCpp)
 def text_unified(model, sampler: Sampler = multinomial()):
-    return SequenceGeneratorAdapter(model, None, sampler)
+    from outlines.processors import TextLogitsProcessor
+
+    logits_processor = TextLogitsProcessor(model.tokenizer)
+    return SequenceGeneratorAdapter(model, logits_processor, sampler)
 
 
 @text.register(VLLM)
 def text_vllm(model: VLLM, sampler: Sampler = multinomial()):
-    return SequenceGeneratorAdapter(model, None, sampler)
+    from outlines.integrations.vllm import TextLogitsProcessor
+
+    logits_processor = TextLogitsProcessor(model)
+    return SequenceGeneratorAdapter(model, logits_processor, sampler)
 
 
 @text.register(OpenAI)

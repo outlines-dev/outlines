@@ -4,4 +4,5 @@ from .structured import (
     JSONLogitsProcessor,
     OutlinesLogitsProcessor,
     RegexLogitsProcessor,
+    TextLogitsProcessor,
 )
