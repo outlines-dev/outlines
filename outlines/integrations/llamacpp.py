@@ -33,7 +33,7 @@ import torch
 from numpy.typing import NDArray
 from pydantic import BaseModel
 
-from outlines.fsm.guide import CFGGuide, Guide, RegexGuide
+from outlines.fsm.guide import CFGGuide, Guide, RegexGuide, StopAtEOSGuide
 from outlines.fsm.json_schema import build_regex_from_schema
 from outlines.integrations.utils import convert_json_schema_to_str
 from outlines.models.llamacpp import LlamaCppTokenizer
@@ -102,6 +102,30 @@ class LogitsProcessor:
     def copy(self) -> "LogitsProcessor":
         """Return a copy of the logits processor."""
         return LogitsProcessor(tokenizer=self.tokenizer, fsm=self.fsm.copy())
+
+
+class TextLogitsProcessor(LogitsProcessor):
+    """Bias vLLM generation for free text (required because of prompt alignment).
+
+    Attributes
+    ----------
+    tokenizer
+        The tokenizer used to convert tokens to ids.
+    fsm
+        The finite state machine which is used to bias the logits.
+    """
+
+    def __init__(self, llm: "Llama"):
+        """Compile the FSM that drives the regex-guided generation.
+
+        Parameters
+        ----------
+        llm
+            The Llama model.
+        """
+        tokenizer = LlamaCppTokenizer(model=llm)
+        fsm = StopAtEOSGuide(tokenizer)
+        super().__init__(tokenizer=tokenizer, fsm=fsm)
 
 
 class RegexLogitsProcessor(LogitsProcessor):

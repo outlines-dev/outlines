@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
 import torch
 from pydantic import BaseModel
 
-from outlines.fsm.guide import CFGGuide, Guide, RegexGuide
+from outlines.fsm.guide import CFGGuide, Guide, RegexGuide, StopAtEOSGuide
 from outlines.fsm.json_schema import build_regex_from_schema
 from outlines.integrations.utils import convert_json_schema_to_str
 
@@ -113,6 +113,29 @@ class FSMLogitsProcessor(OutlinesLogitsProcessor):
     def copy(self) -> "FSMLogitsProcessor":
         """Return a copy of the logits processor."""
         return FSMLogitsProcessor(tokenizer=self.tokenizer, fsm=self.fsm.copy())
+
+
+class TextLogitsProcessor(FSMLogitsProcessor):
+    """Bias generation for free text (required because of prompt alignment).
+
+    Attributes
+    ----------
+    tokenizer
+        The tokenizer used to convert tokens to ids.
+    fsm
+        The finite state machine which is used to bias the logits.
+    """
+
+    def __init__(self, tokenizer: "Tokenizer"):
+        """Compile the FSM that drives the regex-guided generation.
+
+        Parameters
+        ----------
+        tokenizer
+            An Outlines tokenizer.
+        """
+        fsm = StopAtEOSGuide(tokenizer)
+        super().__init__(tokenizer=tokenizer, fsm=fsm)
 
 
 class RegexLogitsProcessor(FSMLogitsProcessor):
