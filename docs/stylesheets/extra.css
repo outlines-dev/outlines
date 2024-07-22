@@ -9,6 +9,10 @@
   --md-code-fg-color: #FFFFFF;
   --md-text-font-family: "Inter";
   --md-code-font: "Source Code Pro Custom";
+
+  /* don't inherit white fg color for mermaid diagrams from --md-code-fg-color */
+  --md-mermaid-label-fg-color: #000000;
+  --md-mermaid-edge-color: #000000;
 }
 
 .index-pre-code {

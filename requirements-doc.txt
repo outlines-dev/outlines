@@ -1,6 +1,7 @@
 mkdocs
 mkdocs-material
 mkdocs-material[imaging]
+mkdocs-mermaid2-plugin
 mkdocs-section-index
 mkdocstrings[python]
 mkdocs-git-committers-plugin-2

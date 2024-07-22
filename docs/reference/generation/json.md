@@ -70,7 +70,8 @@ schema = """
     "name": {"type": "string"},
     "last_name": {"type": "string"},
     "id": {"type": "integer"}
-  }
+  },
+  "required": ["name", "last_name", "id"]
 }
 """
 
