@@ -29,7 +29,7 @@ difference_fsm_fsm.accepts('["a","blue","donkey"]')
 # True
 
 
-model = models.transformers("mistralai/Mistral-7B-Instruct-v0.2")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 generator = generate.fsm(model, difference_fsm)
 response = generator("Don't talk about pink elephants")
 ```

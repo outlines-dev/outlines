@@ -5,7 +5,7 @@ Oultines allows you to make sure the generated text is chosen between different 
 ```python
 from outlines import models, generate
 
-model = models.transformers("mistralai/Mistral-7B-v0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 generator = generate.choice(model, ["skirt", "dress", "pen", "jacket"])
 answer = generator("Pick the odd word out: skirt, dress, pen, jacket")
 

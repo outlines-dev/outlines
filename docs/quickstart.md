@@ -84,13 +84,13 @@ Outlines can be deployed as a LLM service using [vLLM][vllm]{:target="_blank"} a
 First start the server:
 
 ```python
-python -m outlines.serve.serve --model="mistralai/Mistral-7B-Instruct-v0.2"
+python -m outlines.serve.serve --model="microsoft/Phi-3-mini-4k-instruct"
 ```
 
 Or you can start the server with Outlines' official Docker image:
 
 ```bash
-docker run -p 8000:8000 outlinesdev/outlines --model="mistralai/Mistral-7B-Instruct-v0.2"
+docker run -p 8000:8000 outlinesdev/outlines --model="microsoft/Phi-3-mini-4k-instruct"
 ```
 
 This will by default start a server at `http://127.0.0.1:8000` (check what the console says, though). Without the `--model` argument set, the OPT-125M model is used.
@@ -186,7 +186,7 @@ Once you are done experimenting with a prompt and an output structure, it is use
     generate_joke = outlines.Function(
         tell_a_joke,
         Joke,
-        "mistralai/Mistral-7B-Instruct-v0.2"
+        "microsoft/Phi-3-mini-4k-instruct"
     )
     ```
 

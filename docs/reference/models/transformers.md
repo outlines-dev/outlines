@@ -15,7 +15,7 @@ Outlines provides an integration with the `torch` implementation of causal model
 ```python
 from outlines import models
 
-model = models.transformers("mistralai/Mistral-7B-v0.3", device="cuda")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct", device="cuda")
 ```
 
 If you need more fine-grained control you can also initialize the model and tokenizer separately:

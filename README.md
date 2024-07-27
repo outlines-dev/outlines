@@ -66,12 +66,6 @@ is to ensure that there is a well-defined interface between their output and
 user-defined code. **Outlines** provides ways to control the generation of
 language models to make their output more predictable.
 
-Before using mistral models, request access on huggingface [here](https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2).
-``` python
-# login to access mistral model
-from huggingface_hub import login
-login()
-```
 ### Multiple choices
 
 You can reduce the completion to a choice between multiple possibilities:
@@ -79,7 +73,7 @@ You can reduce the completion to a choice between multiple possibilities:
 ``` python
 import outlines
 
-model = outlines.models.transformers("mistralai/Mistral-7B-Instruct-v0.2")
+model = outlines.models.transformers("microsoft/Phi-3-mini-4k-instruct")
 
 prompt = """You are a sentiment-labelling assistant.
 Is the following review positive or negative?
@@ -122,7 +116,7 @@ hood:
 ``` python
 import outlines
 
-model = outlines.models.transformers("mistralai/Mistral-7B-Instruct-v0.2")
+model = outlines.models.transformers("microsoft/Phi-3-mini-4k-instruct")
 
 prompt = "What is the IP address of the Google DNS servers? "
 
@@ -185,7 +179,7 @@ class Character(BaseModel):
     strength: int
 
 
-model = outlines.models.transformers("mistralai/Mistral-7B-Instruct-v0.2")
+model = outlines.models.transformers("microsoft/Phi-3-mini-4k-instruct")
 
 # Construct structured sequence generator
 generator = outlines.generate.json(model, Character)
@@ -250,7 +244,7 @@ schema = '''{
     }
 }'''
 
-model = outlines.models.transformers("mistralai/Mistral-7B-Instruct-v0.2")
+model = outlines.models.transformers("microsoft/Phi-3-mini-4k-instruct")
 generator = outlines.generate.json(model, schema)
 character = generator("Give me a character description")
 ```
@@ -338,7 +332,7 @@ def labelling(to_label, examples):
     {{ to_label }} //
     """
 
-model = outlines.models.transformers("mistralai/Mistral-7B-Instruct-v0.2")
+model = outlines.models.transformers("microsoft/Phi-3-mini-4k-instruct")
 prompt = labelling("Just awesome", examples)
 answer = outlines.generate.text(model)(prompt, max_tokens=100)
 ```

@@ -23,7 +23,7 @@ Phi-2 will be playing against itself:
 ```python
 from outlines import models
 
-model = models.transformers("microsoft/phi-2")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 
 ```
 

@@ -12,7 +12,7 @@ Before diving into how to use structure generation for this task let's start wit
 ```python
 import outlines
 
-model_name = 'mistralai/Mistral-7B-Instruct-v0.2'
+model_name = 'microsoft/Phi-3-mini-4k-instruct'
 model = outlines.models.transformers(model_name)
 ```
 
@@ -31,7 +31,7 @@ messages_phone = [
 ]
 
 # This allows us to properly format our prompt for
-# Mistrals 'Instruct' interface.
+# Phi-3 Mini's 'Instruct' interface.
 prompt_phone = tokenizer.apply_chat_template(messages_phone, tokenize=False)
 ```
 
