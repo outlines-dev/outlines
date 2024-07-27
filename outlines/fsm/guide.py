@@ -1,5 +1,6 @@
 import collections
 import copy
+import warnings
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -319,6 +320,11 @@ class CFGGuide(Guide):
         """
         Construct the PartialLark parser and set the empty initial_state (PartialParserState)
         """
+        warnings.warn(
+            "Outlines' public *community-contributed* CFG structured generation is experimental. "
+            "Please review https://outlines-dev.github.io/outlines/reference/cfg#disclaimer"
+        )
+
         self.cfg_string = cfg_string
         self.tokenizer = tokenizer
         self.eos_token_id = self.tokenizer.eos_token_id
