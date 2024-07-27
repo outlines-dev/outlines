@@ -43,10 +43,13 @@ SIGNED_FLOAT: ["+"|"-"] FLOAT
 NUMBER: FLOAT | INT
 SIGNED_NUMBER: ["+"|"-"] NUMBER
 
-//
-// TODO: Working escaped_string
-//
 UNESCAPED_STRING: /\"[^"]*\"/
+
+// based on `outlines/fsm/json_schema.py`
+_NON_CONTROL_CHAR: /([^"\\\x00-\x1F\x7F-\x9F])/
+_ESCAPED_CHAR: /\\/ (_NON_CONTROL_CHAR | /\\/ | /"/)
+ESCAPED_STRING_INNER: _NON_CONTROL_CHAR | _ESCAPED_CHAR
+ESCAPED_STRING: /"/ ESCAPED_STRING_INNER* /"/
 
 
 

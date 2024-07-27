@@ -205,49 +205,47 @@ def test_cfg():
             return {v: k for k, v in self.vocabulary.items()}
 
         def decode(self, token_ids):
-            return [self.inverse_vocabulary[t] for t in token_ids]
+            if isinstance(token_ids[0], list):
+                return [
+                    "".join(map(self.inverse_vocabulary.get, token_ids_sublist))
+                    for token_ids_sublist in token_ids
+                ]
+            return [self.inverse_vocabulary[token_id] for token_id in token_ids]
 
     cfg_str = """
         start: expr
         expr: "{" expr "}" | "[" expr "]" |
     """
     tokenizer = MockTokenizer()
-    fsm = CFGGuide(cfg_str, tokenizer)
 
-    instruction = fsm.get_next_instruction(fsm.start_state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 3, 5])
-    state = fsm.get_next_state(state=fsm.start_state, token_id=1)
-    assert fsm.generation == "{"
-    assert not fsm.is_final_state(state)
+    guide = CFGGuide(cfg_str, tokenizer)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
-    state = fsm.get_next_state(state=state, token_id=3)
-    assert fsm.generation == "{["
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(
+        guide.get_next_instruction(guide.initial_state).tokens, [1, 3, 5]
+    )
+    state = guide.get_next_state(guide.initial_state, token_id=1)
+    assert not guide.must_terminate_state(state)
+    assert not guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 3, 4])
-    state = fsm.get_next_state(state=state, token_id=4)
-    assert fsm.generation == "{[]"
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 2, 3])
+    state = guide.get_next_state(state, token_id=3)
+    assert not guide.must_terminate_state(state)
+    assert not guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [2])
-    state = fsm.get_next_state(state=state, token_id=2)
-    assert fsm.generation == "{[]}"
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 3, 4])
+    state = guide.get_next_state(state, token_id=4)
+    assert not guide.must_terminate_state(state)
+    assert not guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Write)
-    assert_expected_tensor_ids(instruction.tokens, [5])
-    state = fsm.get_next_state(state=state, token_id=5)
-    assert fsm.generation == "{[]}"
-    assert fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [2])
+    state = guide.get_next_state(state, token_id=2)
+    assert guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
+
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [5])
+    state = guide.get_next_state(state, token_id=5)
+    assert guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
 
 
 def test_cfg_early_termination():
@@ -265,7 +263,12 @@ def test_cfg_early_termination():
             return {v: k for k, v in self.vocabulary.items()}
 
         def decode(self, token_ids):
-            return [self.inverse_vocabulary[t] for t in token_ids]
+            if isinstance(token_ids[0], list):
+                return [
+                    "".join(map(self.inverse_vocabulary.get, token_ids_sublist))
+                    for token_ids_sublist in token_ids
+                ]
+            return [self.inverse_vocabulary[token_id] for token_id in token_ids]
 
     cfg_str = """
         start: expr+
@@ -273,34 +276,29 @@ def test_cfg_early_termination():
         subexpr: expr |
     """
     tokenizer = MockTokenizer()
-    fsm = CFGGuide(cfg_str, tokenizer)
 
-    instruction = fsm.get_next_instruction(fsm.start_state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1])
-    state = fsm.get_next_state(state=fsm.start_state, token_id=1)
-    assert fsm.generation == "("
-    assert not fsm.is_final_state(state)
+    guide = CFGGuide(cfg_str, tokenizer)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 2])
-    state = fsm.get_next_state(state=state, token_id=2)
-    assert fsm.generation == "()"
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(
+        guide.get_next_instruction(guide.initial_state).tokens, [1]
+    )
+    state = guide.get_next_state(guide.initial_state, token_id=1)
+    assert not guide.must_terminate_state(state)
+    assert not guide.can_terminate_state(state)
+
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 2])
+    state = guide.get_next_state(state, token_id=2)
+    assert not guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
 
     # possible to continue or terminate
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 3])
-    state = fsm.get_next_state(state=state, token_id=3)  # feed eos
-    assert fsm.generation == "()"
-    assert fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 3])
+    state = guide.get_next_state(state, token_id=3)  # feed eos
+    assert guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
 
     # once eos generated, can only terminate
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Write)
-    assert_expected_tensor_ids(instruction.tokens, [3])
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [3])
 
 
 def test_cfg_ignore_directive():
@@ -318,7 +316,12 @@ def test_cfg_ignore_directive():
             return {v: k for k, v in self.vocabulary.items()}
 
         def decode(self, token_ids):
-            return [self.inverse_vocabulary[t] for t in token_ids]
+            if isinstance(token_ids[0], list):
+                return [
+                    "".join(map(self.inverse_vocabulary.get, token_ids_sublist))
+                    for token_ids_sublist in token_ids
+                ]
+            return [self.inverse_vocabulary[token_id] for token_id in token_ids]
 
     cfg_str = """
         start: LETTER+
@@ -327,56 +330,43 @@ def test_cfg_ignore_directive():
         %ignore WS
     """
     tokenizer = MockTokenizer()
-    fsm = CFGGuide(cfg_str, tokenizer)
 
-    state = 0
+    guide = CFGGuide(cfg_str, tokenizer)
 
-    instruction = fsm.get_next_instruction(0)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 2])
-    state = fsm.get_next_state(state=0, token_id=2)
-    assert fsm.generation == " "
-    assert not fsm.is_final_state(state)
+    state = guide.initial_state
 
-    instruction = fsm.get_next_instruction(0)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 2])
-    state = fsm.get_next_state(state=0, token_id=1)
-    assert fsm.generation == " a"
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 2])
+    state = guide.get_next_state(state, token_id=2)
+    assert not guide.must_terminate_state(state)
+    assert not guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
-    state = fsm.get_next_state(state=state, token_id=2)
-    assert fsm.generation == " a "
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 2])
+    state = guide.get_next_state(state, token_id=1)
+    assert not guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
-    state = fsm.get_next_state(state=state, token_id=2)
-    assert fsm.generation == " a  "
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 2, 3])
+    state = guide.get_next_state(state, token_id=2)
+    assert not guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
-    state = fsm.get_next_state(state=state, token_id=1)
-    assert fsm.generation == " a  a"
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 2, 3])
+    state = guide.get_next_state(state, token_id=2)
+    assert not guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 2, 3])
-    state = fsm.get_next_state(state=state, token_id=3)
-    assert fsm.generation == " a  a"
-    assert fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 2, 3])
+    state = guide.get_next_state(state, token_id=1)
+    assert not guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
+
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 2, 3])
+    state = guide.get_next_state(state, token_id=3)
+    assert guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
 
     # once eos generated, can only terminate
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Write)
-    assert_expected_tensor_ids(instruction.tokens, [3])
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [3])
 
 
 def test_cfg_multitoken_terminal():
@@ -394,38 +384,37 @@ def test_cfg_multitoken_terminal():
             return {v: k for k, v in self.vocabulary.items()}
 
         def decode(self, token_ids):
-            return [self.inverse_vocabulary[t] for t in token_ids]
+            if isinstance(token_ids[0], list):
+                return [
+                    "".join(map(self.inverse_vocabulary.get, token_ids_sublist))
+                    for token_ids_sublist in token_ids
+                ]
+            return [self.inverse_vocabulary[token_id] for token_id in token_ids]
 
     cfg_str = """
         start: S
         S: "aa" | "bb"
     """
     tokenizer = MockTokenizer()
-    fsm = CFGGuide(cfg_str, tokenizer)
 
-    instruction = fsm.get_next_instruction(fsm.start_state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 2])
-    assert fsm.reset_state  # starting new regex
-    state = fsm.get_next_state(state=fsm.start_state, token_id=1)
-    assert fsm.generation == "a"
-    assert not fsm.is_final_state(state)
+    guide = CFGGuide(cfg_str, tokenizer)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1])
-    assert not fsm.reset_state  # continuing current regex
-    state = fsm.get_next_state(state=state, token_id=1)
-    assert fsm.generation == "aa"
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(
+        guide.get_next_instruction(guide.initial_state).tokens, [1, 2]
+    )
+    state = guide.get_next_state(guide.initial_state, token_id=1)
+    assert not guide.must_terminate_state(state)
+    assert not guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Write)
-    assert_expected_tensor_ids(instruction.tokens, [3])
-    assert not fsm.reset_state  # completing current regex
-    state = fsm.get_next_state(state=state, token_id=3)
-    assert fsm.generation == "aa"
-    assert fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1])
+    state = guide.get_next_state(state, token_id=1)
+    assert guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
+
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [3])
+    state = guide.get_next_state(state, token_id=3)
+    assert guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
 
 
 def test_cfg_allow_both_extend_and_shift_terminal():
@@ -443,46 +432,45 @@ def test_cfg_allow_both_extend_and_shift_terminal():
             return {v: k for k, v in self.vocabulary.items()}
 
         def decode(self, token_ids):
-            return [self.inverse_vocabulary[t] for t in token_ids]
+            if isinstance(token_ids[0], list):
+                return [
+                    "".join(map(self.inverse_vocabulary.get, token_ids_sublist))
+                    for token_ids_sublist in token_ids
+                ]
+            return [self.inverse_vocabulary[token_id] for token_id in token_ids]
 
     cfg_str = """
         start: s
         s: "(" s ")" | /a+/
     """
     tokenizer = MockTokenizer()
-    fsm = CFGGuide(cfg_str, tokenizer)
 
-    instruction = fsm.get_next_instruction(fsm.start_state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 3])
-    state = fsm.get_next_state(state=fsm.start_state, token_id=1)
-    assert fsm.generation == "("
-    assert not fsm.is_final_state(state)
+    guide = CFGGuide(cfg_str, tokenizer)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [1, 3])
-    state = fsm.get_next_state(state=state, token_id=3)
-    assert fsm.generation == "(a"
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(
+        guide.get_next_instruction(guide.initial_state).tokens, [1, 3]
+    )
+    state = guide.get_next_state(guide.initial_state, token_id=1)
+    assert not guide.must_terminate_state(state)
+    assert not guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [2, 3])
-    state = fsm.get_next_state(state=state, token_id=3)
-    assert fsm.generation == "(aa"
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [1, 3])
+    state = guide.get_next_state(state, token_id=3)
+    assert not guide.must_terminate_state(state)
+    assert not guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Generate)
-    assert_expected_tensor_ids(instruction.tokens, [2, 3])
-    state = fsm.get_next_state(state=state, token_id=2)
-    assert fsm.generation == "(aa)"
-    assert not fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [2, 3])
+    state = guide.get_next_state(state, token_id=3)
+    assert not guide.must_terminate_state(state)
+    assert not guide.can_terminate_state(state)
 
-    instruction = fsm.get_next_instruction(state)
-    assert isinstance(instruction, Write)
-    assert_expected_tensor_ids(instruction.tokens, [4])
-    state = fsm.get_next_state(state=state, token_id=4)
-    assert fsm.generation == "(aa)"
-    assert fsm.is_final_state(state)
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [2, 3])
+    state = guide.get_next_state(state, token_id=2)
+
+    assert guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)
+
+    assert_expected_tensor_ids(guide.get_next_instruction(state).tokens, [4])
+    state = guide.get_next_state(state, token_id=4)
+    assert guide.must_terminate_state(state)
+    assert guide.can_terminate_state(state)

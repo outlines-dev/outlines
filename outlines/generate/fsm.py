@@ -16,19 +16,19 @@ from outlines.samplers import Sampler, multinomial
 def fsm(
     model, fsm: interegular.fsm.FSM, sampler: Sampler = multinomial()
 ) -> SequenceGeneratorAdapter:
-    from outlines.processors import FSMLogitsProcessor
+    from outlines.processors import GuideLogitsProcessor
 
-    fsm = RegexGuide.from_interegular_fsm(fsm, model.tokenizer)
-    logits_processor = FSMLogitsProcessor(tokenizer=model.tokenizer, fsm=fsm)
+    guide = RegexGuide.from_interegular_fsm(fsm, model.tokenizer)
+    logits_processor = GuideLogitsProcessor(tokenizer=model.tokenizer, guide=guide)
     return SequenceGeneratorAdapter(model, logits_processor, sampler)
 
 
 @fsm.register(TransformersVision)
 def fsm_vision(model, fsm: interegular.fsm.FSM, sampler: Sampler = multinomial()):
-    from outlines.processors import FSMLogitsProcessor
+    from outlines.processors import GuideLogitsProcessor
 
-    fsm = RegexGuide.from_interegular_fsm(fsm, model.tokenizer)
-    logits_processor = FSMLogitsProcessor(tokenizer=model.tokenizer, fsm=fsm)
+    guide = RegexGuide.from_interegular_fsm(fsm, model.tokenizer)
+    logits_processor = GuideLogitsProcessor(tokenizer=model.tokenizer, guide=guide)
     return VisionSequenceGeneratorAdapter(model, logits_processor, sampler)
 
 

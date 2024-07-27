@@ -1,6 +1,6 @@
 from .structured import (
     CFGLogitsProcessor,
-    FSMLogitsProcessor,
+    GuideLogitsProcessor,
     JSONLogitsProcessor,
     OutlinesLogitsProcessor,
     RegexLogitsProcessor,

@@ -1,0 +1,372 @@
+{
+    ".class": "MypyFile",
+    "_fullname": "outlines.generate.samplers",
+    "future_import_flags": [],
+    "is_partial_stub_package": false,
+    "is_stub": false,
+    "names": {
+        ".class": "SymbolTable",
+        "Protocol": {
+            ".class": "SymbolTableNode",
+            "cross_ref": "typing.Protocol",
+            "kind": "Gdef"
+        },
+        "Sampler": {
+            ".class": "SymbolTableNode",
+            "kind": "Gdef",
+            "node": {
+                ".class": "TypeInfo",
+                "_promote": [],
+                "abstract_attributes": [
+                    [
+                        "__call__",
+                        2
+                    ]
+                ],
+                "alt_promote": null,
+                "bases": [
+                    "builtins.object"
+                ],
+                "dataclass_transform_spec": null,
+                "declared_metaclass": null,
+                "defn": {
+                    ".class": "ClassDef",
+                    "fullname": "outlines.generate.samplers.Sampler",
+                    "name": "Sampler",
+                    "type_vars": []
+                },
+                "deletable_attributes": [],
+                "flags": [
+                    "is_abstract",
+                    "is_protocol"
+                ],
+                "fullname": "outlines.generate.samplers.Sampler",
+                "has_param_spec_type": false,
+                "metaclass_type": "abc.ABCMeta",
+                "metadata": {},
+                "module_name": "outlines.generate.samplers",
+                "mro": [
+                    "outlines.generate.samplers.Sampler",
+                    "builtins.object"
+                ],
+                "names": {
+                    ".class": "SymbolTable",
+                    "__call__": {
+                        ".class": "SymbolTableNode",
+                        "kind": "Mdef",
+                        "node": {
+                            ".class": "FuncDef",
+                            "abstract_status": 2,
+                            "arg_kinds": [
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "arg_names": [
+                                "self",
+                                "logits",
+                                "samples",
+                                "rng"
+                            ],
+                            "dataclass_transform_spec": null,
+                            "flags": [
+                                "is_trivial_body"
+                            ],
+                            "fullname": "outlines.generate.samplers.Sampler.__call__",
+                            "name": "__call__",
+                            "type": {
+                                ".class": "CallableType",
+                                "arg_kinds": [
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                ],
+                                "arg_names": [
+                                    "self",
+                                    "logits",
+                                    "samples",
+                                    "rng"
+                                ],
+                                "arg_types": [
+                                    "outlines.generate.samplers.Sampler",
+                                    {
+                                        ".class": "AnyType",
+                                        "missing_import_name": "outlines.generate.samplers.torch",
+                                        "source_any": null,
+                                        "type_of_any": 3
+                                    },
+                                    "builtins.int",
+                                    {
+                                        ".class": "AnyType",
+                                        "missing_import_name": "outlines.generate.samplers.torch",
+                                        "source_any": null,
+                                        "type_of_any": 3
+                                    }
+                                ],
+                                "bound_args": [],
+                                "def_extras": {
+                                    "first_arg": "self"
+                                },
+                                "fallback": "builtins.function",
+                                "from_concatenate": false,
+                                "implicit": false,
+                                "is_ellipsis_args": false,
+                                "name": "__call__ of Sampler",
+                                "ret_type": {
+                                    ".class": "AnyType",
+                                    "missing_import_name": "outlines.generate.samplers.torch",
+                                    "source_any": null,
+                                    "type_of_any": 3
+                                },
+                                "type_guard": null,
+                                "unpack_kwargs": false,
+                                "variables": []
+                            }
+                        }
+                    }
+                },
+                "self_type": null,
+                "slots": null,
+                "tuple_type": null,
+                "type_vars": [],
+                "typeddict_type": null
+            }
+        },
+        "__annotations__": {
+            ".class": "SymbolTableNode",
+            "kind": "Gdef",
+            "node": {
+                ".class": "Var",
+                "flags": [
+                    "is_ready"
+                ],
+                "fullname": "outlines.generate.samplers.__annotations__",
+                "name": "__annotations__",
+                "type": {
+                    ".class": "Instance",
+                    "args": [
+                        "builtins.str",
+                        {
+                            ".class": "AnyType",
+                            "missing_import_name": null,
+                            "source_any": null,
+                            "type_of_any": 6
+                        }
+                    ],
+                    "type_ref": "builtins.dict"
+                }
+            }
+        },
+        "__doc__": {
+            ".class": "SymbolTableNode",
+            "kind": "Gdef",
+            "node": {
+                ".class": "Var",
+                "flags": [
+                    "is_ready"
+                ],
+                "fullname": "outlines.generate.samplers.__doc__",
+                "name": "__doc__",
+                "type": "builtins.str"
+            }
+        },
+        "__file__": {
+            ".class": "SymbolTableNode",
+            "kind": "Gdef",
+            "node": {
+                ".class": "Var",
+                "flags": [
+                    "is_ready"
+                ],
+                "fullname": "outlines.generate.samplers.__file__",
+                "name": "__file__",
+                "type": "builtins.str"
+            }
+        },
+        "__name__": {
+            ".class": "SymbolTableNode",
+            "kind": "Gdef",
+            "node": {
+                ".class": "Var",
+                "flags": [
+                    "is_ready"
+                ],
+                "fullname": "outlines.generate.samplers.__name__",
+                "name": "__name__",
+                "type": "builtins.str"
+            }
+        },
+        "__package__": {
+            ".class": "SymbolTableNode",
+            "kind": "Gdef",
+            "node": {
+                ".class": "Var",
+                "flags": [
+                    "is_ready"
+                ],
+                "fullname": "outlines.generate.samplers.__package__",
+                "name": "__package__",
+                "type": "builtins.str"
+            }
+        },
+        "greedy": {
+            ".class": "SymbolTableNode",
+            "kind": "Gdef",
+            "node": {
+                ".class": "FuncDef",
+                "abstract_status": 0,
+                "arg_kinds": [
+                    0,
+                    0,
+                    2
+                ],
+                "arg_names": [
+                    "logits",
+                    "samples",
+                    "_"
+                ],
+                "dataclass_transform_spec": null,
+                "flags": [],
+                "fullname": "outlines.generate.samplers.greedy",
+                "name": "greedy",
+                "type": {
+                    ".class": "CallableType",
+                    "arg_kinds": [
+                        0,
+                        0,
+                        2
+                    ],
+                    "arg_names": [
+                        "logits",
+                        "samples",
+                        "_"
+                    ],
+                    "arg_types": [
+                        {
+                            ".class": "AnyType",
+                            "missing_import_name": "outlines.generate.samplers.torch",
+                            "source_any": null,
+                            "type_of_any": 3
+                        },
+                        "builtins.int",
+                        {
+                            ".class": "AnyType",
+                            "missing_import_name": null,
+                            "source_any": null,
+                            "type_of_any": 1
+                        }
+                    ],
+                    "bound_args": [],
+                    "def_extras": {
+                        "first_arg": null
+                    },
+                    "fallback": "builtins.function",
+                    "from_concatenate": false,
+                    "implicit": false,
+                    "is_ellipsis_args": false,
+                    "name": "greedy",
+                    "ret_type": {
+                        ".class": "AnyType",
+                        "missing_import_name": "outlines.generate.samplers.torch",
+                        "source_any": null,
+                        "type_of_any": 3
+                    },
+                    "type_guard": null,
+                    "unpack_kwargs": false,
+                    "variables": []
+                }
+            }
+        },
+        "multinomial": {
+            ".class": "SymbolTableNode",
+            "kind": "Gdef",
+            "node": {
+                ".class": "FuncDef",
+                "abstract_status": 0,
+                "arg_kinds": [
+                    0,
+                    0,
+                    0
+                ],
+                "arg_names": [
+                    "logits",
+                    "samples",
+                    "rng"
+                ],
+                "dataclass_transform_spec": null,
+                "flags": [],
+                "fullname": "outlines.generate.samplers.multinomial",
+                "name": "multinomial",
+                "type": {
+                    ".class": "CallableType",
+                    "arg_kinds": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "arg_names": [
+                        "logits",
+                        "samples",
+                        "rng"
+                    ],
+                    "arg_types": [
+                        {
+                            ".class": "AnyType",
+                            "missing_import_name": "outlines.generate.samplers.torch",
+                            "source_any": null,
+                            "type_of_any": 3
+                        },
+                        "builtins.int",
+                        {
+                            ".class": "AnyType",
+                            "missing_import_name": "outlines.generate.samplers.torch",
+                            "source_any": null,
+                            "type_of_any": 3
+                        }
+                    ],
+                    "bound_args": [],
+                    "def_extras": {
+                        "first_arg": null
+                    },
+                    "fallback": "builtins.function",
+                    "from_concatenate": false,
+                    "implicit": false,
+                    "is_ellipsis_args": false,
+                    "name": "multinomial",
+                    "ret_type": {
+                        ".class": "AnyType",
+                        "missing_import_name": "outlines.generate.samplers.torch",
+                        "source_any": null,
+                        "type_of_any": 3
+                    },
+                    "type_guard": null,
+                    "unpack_kwargs": false,
+                    "variables": []
+                }
+            }
+        },
+        "torch": {
+            ".class": "SymbolTableNode",
+            "kind": "Gdef",
+            "node": {
+                ".class": "Var",
+                "flags": [
+                    "is_suppressed_import",
+                    "is_ready",
+                    "is_inferred"
+                ],
+                "fullname": "outlines.generate.samplers.torch",
+                "name": "torch",
+                "type": {
+                    ".class": "AnyType",
+                    "missing_import_name": "outlines.generate.samplers.torch",
+                    "source_any": null,
+                    "type_of_any": 3
+                }
+            }
+        }
+    },
+    "path": "/home/andrew/p/outlines/outlines/generate/samplers.py"
+}

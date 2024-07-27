@@ -1,8 +1,12 @@
+import collections
+import copy
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Dict,
+    Generator,
     List,
     Optional,
     Protocol,
@@ -13,10 +17,12 @@ from typing import (
 
 import interegular
 import torch
-from lark import Lark
+from lark.indenter import DedentError
+from lark.lexer import UnexpectedCharacters, UnexpectedToken
 
 from outlines import grammars
 from outlines.caching import cache
+from outlines.fsm.parsing import PartialLark, PartialParserState
 from outlines.fsm.regex import (
     create_fsm_index_tokenizer,
     make_byte_level_fsm,
@@ -69,13 +75,15 @@ class Guide(Protocol):
 
     """
 
-    def get_next_instruction(self, state: int) -> Instruction:
+    initial_state: Any
+
+    def get_next_instruction(self, state: Any) -> Instruction:
         ...
 
-    def get_next_state(self, state: int, token_id: int) -> int:
+    def get_next_state(self, state: Any, token_id: int) -> Any:
         ...
 
-    def is_final_state(self, state: int) -> bool:
+    def is_final_state(self, state: Any) -> bool:
         ...
 
     def copy(self) -> "Guide":
@@ -86,7 +94,8 @@ class StopAtEOSGuide(Guide):
     """Guide to generate tokens until the EOS token has been generated."""
 
     final_state = 1
-    start_state = 0
+    start_state = 0  # TODO: remove start_state, use only initial_state
+    initial_state = 0
 
     def __init__(self, tokenizer: "Tokenizer"):
         """Initialize the generation guide.
@@ -107,7 +116,7 @@ class StopAtEOSGuide(Guide):
         if token_id == self.eos_token_id or state == self.final_state:
             return self.final_state
 
-        return self.start_state
+        return self.initial_state
 
     def is_final_state(self, state: int):
         return state == self.final_state
@@ -300,178 +309,175 @@ class RegexGuide(Guide):
         return self
 
 
+CFGState = collections.namedtuple("CFGState", ["parser_state", "prev_token"])
+
+
 class CFGGuide(Guide):
-    """Guide to generate text that is in the language of a context-free grammar."""
+    """Guide to generate text that is in the language of a context-free Lark grammar."""
 
     def __init__(self, cfg_string: str, tokenizer):
+        """
+        Construct the PartialLark parser and set the empty initial_state (PartialParserState)
+        """
         self.cfg_string = cfg_string
         self.tokenizer = tokenizer
-
-        self.parser = Lark(
+        self.eos_token_id = self.tokenizer.eos_token_id
+        self.parser = PartialLark(
             cfg_string,
             parser="lalr",
-            lexer="contextual",
-            propagate_positions=False,
-            maybe_placeholders=False,
-            regex=True,
             import_paths=[grammars.GRAMMAR_PATH],
         )
-        self.terminal_regexps = dict()
-        for terminal in self.parser.terminals:
-            if terminal.pattern is not None:
-                self.terminal_regexps[terminal.name] = terminal.pattern.to_regexp()
-        self.terminal_regexps["$END"] = tokenizer.eos_token
+        self.initial_state = CFGState(
+            parser_state=self.parser.parse(""), prev_token=None
+        )
 
-        self.generation = ""
-        self.reset_state = False
-        self.allow_eos = False
-        self.regex_fsm: RegexGuide
+    def get_next_instruction(self, state: CFGState) -> Instruction:
+        """Return the next instruction for guided generation.
 
-        self.check_last = False
-        self.proposal_last: List[int] = []
-        self.regex_fsm_last: RegexGuide
+        Current lazy approach:
+        - For each token in the vocabulary
+          - create a copy of the parsers state
+          - add the tokens to the parsers input text
+          - if valid, add token to returned tokens
 
-        self.start_state = 0
-        self.final_state = -1
-
-    def get_next_instruction(self, state: int) -> Instruction:
-        """Generate an instruction for the next step.
-
-        Upon initialization, the CFG incremental parser is used to determine the
-        first regex and construct the first FSM to generate the first terminal.
-
-        This FSM is used for proposals until either:
-
-        - The FSM is exhausted, and its only remaining option is the EOS token,
-          in which case we feed the generated terminal to the
-          CFG incremental parser and allow it to propose the next regex
-          corresponding to the next set of valid terminals.
-        - The current FSM can be exhausted, but the EOS token is not the only
-          remaining option. In this case we allow proposal of current terminal
-          extensions, store the current FSM and its state, then also use the CFG
-          parser to propose a new regex corresponding to terminating the current
-          terminal and starting the next one. The model can then sample from
-          either of these sets to determine whether to extend the current
-          terminal or terminate it and start the next one.
-
-        The CFG incremental parser is allowed to propose the EOS token from any accepting state,
-        and once it is generated, the FSM will continue to always generate the EOS token.
+        Further refinements are necessary for performant text processing.
 
         Parameters
         ----------
         state
-            The current state of the FSM.
+            The guides current PartialParserState, or None if complete
 
         Returns
         -------
-        A list that contains the tokens to mask.
+        A `Generate` instance that contains the model and the allowed token ids.
 
         """
-        if self.is_final_state(state):
-            return Write([self.tokenizer.eos_token_id])
 
-        proposal: List[int] = []
-        if self.generation != "":
-            if self.check_last:
-                proposer = self.regex_fsm_last
+        if state.parser_state is None:
+            return Write(torch.tensor([self.eos_token_id]))
+
+        valid_tokens = list(
+            self.iter_valid_token_ids(state, self.tokenizer.vocabulary.values())
+        )
+        if len(valid_tokens) == 1:
+            return Write(torch.tensor(valid_tokens))
+        return Generate(torch.tensor(valid_tokens))
+
+    def iter_valid_token_ids(
+        self, state: CFGState, candidate_token_ids: list
+    ) -> Generator[int, None, None]:
+        """
+        Iterate over the given token_ids and yield those that are valid for the current parser state.
+
+        Parameters
+        ----------
+        parser_state
+            The current state of the parser, or None if complete.
+        token_ids
+            The list of token ids to check for validity.
+
+        Yields
+        ------
+        int
+            Valid token ids.
+        """
+        if state.parser_state is None:
+            yield self.eos_token_id
+            return
+
+        for token_id in candidate_token_ids:
+            if token_id == self.eos_token_id:
+                if self.can_terminate_state(state):
+                    yield token_id
             else:
-                proposer = self.regex_fsm
+                try:
+                    self._get_parser_state_token_applied(state, int(token_id))
+                    yield token_id
+                except (
+                    ValueError,
+                    EOFError,
+                    UnexpectedToken,
+                    UnexpectedCharacters,
+                    DedentError,
+                ):
+                    pass
 
-            instruction = proposer.get_next_instruction(state)
-
-            assert instruction.tokens is not None
-
-            if isinstance(instruction, Write):
-                proposal += instruction.tokens
-            else:
-                proposal += instruction.tokens
-
-            if self.tokenizer.eos_token_id not in proposal:
-                return Generate(proposal)
-
-            self.check_last = False
-            proposal = [x for x in proposal if x != self.tokenizer.eos_token_id]
-            if len(proposal) > 0:
-                self.check_last = True
-                self.proposal_last = proposal.copy()
-                self.regex_fsm_last = proposer
-
-        interactive = self.parser.parse_interactive(self.generation)
-        interactive.exhaust_lexer()
-
-        options = {self.terminal_regexps[x] for x in interactive.accepts()}
-        # add %ignore terminals
-        options |= {self.terminal_regexps[x] for x in self.parser.lexer_conf.ignore}
-
-        if self.terminal_regexps["$END"] in options:
-            options.remove(self.terminal_regexps["$END"])
-            if len(options) == 0:
-                return Write([self.tokenizer.eos_token_id])
-            self.allow_eos = True
-            options.add("")
-            assert len(options) > 1
-
-        regex_string = r"(" + r"|".join([r"(" + x + r")" for x in options]) + r")"
-        self.regex_fsm = RegexGuide(regex_string, self.tokenizer)
-        self.reset_state = True
-
-        instruction = self.regex_fsm.get_next_instruction(self.start_state)
-
-        assert instruction.tokens is not None
-
-        if isinstance(instruction, Write):
-            proposal += instruction.tokens
-        else:
-            proposal += instruction.tokens
-
-        if self.allow_eos:
-            self.allow_eos = False
-        else:
-            proposal = [x for x in proposal if x != self.tokenizer.eos_token_id]
-            assert len(proposal) > 0
-
-        return Generate(proposal)
-
-    def get_next_state(self, state: int, token_id: int) -> int:
-        """Update the state of the guide.
-
-        Transitions the underlying regex FSM to its next state.
-        If at max tokens or EOS token, transition permanently to the final state.
-        Update stored partial generations for subsequent incremental parsing.
+    def get_next_state(self, state: CFGState, token_id: int) -> CFGState:
+        """
+        Update the state of the guide.
+        Decode the token_id, and calculate the new parser_state with the token applied.
 
         Parameters
         ----------
         state
-            The current state of the FSM.
+            The guides current PartialParserState, or None if complete
         token_id
             The id of the token that was just generated.
 
         Returns
         -------
-        The new state of the FSM.
+        The guides new PartialParserState
+
         """
+        if state.parser_state is None or token_id == self.eos_token_id:
+            parser_state = None
+        else:
+            parser_state = self._get_parser_state_token_applied(state, int(token_id))
+        return CFGState(parser_state=parser_state, prev_token=token_id)
 
-        # We need to return the final state when in the final state because we
-        # then generate EOS tokens instead of stopping the generation.
-        if token_id == self.tokenizer.eos_token_id or state == self.final_state:
-            return self.final_state
+    def _get_parser_state_token_applied(
+        self, state: CFGState, token_id: int
+    ) -> PartialParserState:
+        """
+        Don't mutate `parser_state`, copy to protect
 
-        self.generation += self.tokenizer.decode([token_id])[0]
+        Get the token string
+          - if first token in generation: tokenizer.decode (no leading whitespace)
+          - else: normalized (with possibly leading whitespace)
 
-        if self.check_last:
-            if token_id in self.proposal_last:
-                return self.regex_fsm_last.get_next_state(state, token_id)
-            self.check_last = False
+        Don't allow empty ("") tokens, raise ValueError
+        """
+        parser_state = copy.copy(state.parser_state)  # prevent side effects
 
-        if self.reset_state:
-            self.reset_state = False
-            state = self.start_state
+        # normalize
+        if state.prev_token is None:
+            new_token_str = self.tokenizer.decode([token_id])[0]
+        else:
+            prev_token_str = self.tokenizer.decode([[state.prev_token]])[0]
+            combined_token_str = self.tokenizer.decode([[state.prev_token, token_id]])[
+                0
+            ]
+            new_token_str = combined_token_str[len(prev_token_str) :]
 
-        return self.regex_fsm.get_next_state(state, token_id)
+        if new_token_str == "":
+            raise ValueError("empty next token")
 
-    def is_final_state(self, state: int) -> bool:
-        return state == self.final_state
+        # update parser with new token
+        parser_state.lexer.state.text += new_token_str
+        self.parser.parse_from_state(parser_state, is_end=False)
+
+        return parser_state
+
+    def is_final_state(self, state: CFGState) -> bool:
+        # TODO: remove this method, use can_terminate_state and must_terminate_state
+        # here and in RegexGuide per https://github.com/outlines-dev/outlines/issues/885
+        return self.can_terminate_state(state)
+
+    def can_terminate_state(self, state: CFGState) -> bool:
+        """Generation is allowed to terminate"""
+        if state.parser_state is not None:
+            try:
+                copy.copy(state.parser_state).feed_eof()
+            except UnexpectedToken:
+                return False
+        return True
+
+    def must_terminate_state(self, state: CFGState) -> bool:
+        """Generation must terminate, no legal continuations"""
+        return state.parser_state is None or set(state.parser_state.accepts()).issubset(
+            {"$END"}
+        )
 
     def copy(self) -> "CFGGuide":
-        """Create a copy of the FSM."""
+        """Create a copy of the Guide."""
         return CFGGuide(self.cfg_string, self.tokenizer)

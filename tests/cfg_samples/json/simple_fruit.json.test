@@ -1,0 +1,20 @@
+[
+    {
+        "ID": "1",
+        "Name": "Andrew \"The Escaper\" Lapp",
+        "Age": "30",
+        "FavFruit": "Banana"
+    },
+    {
+        "ID": "2",
+        "Name": "Mohammad",
+        "Age": "40",
+        "FavFruit": "\"Any Fruit As Long as It's In Quotes!\""
+    },
+    {
+        "ID": "3",
+        "Name": "Alice",
+        "Age": "61",
+        "FavFruit": "Peaches, but only \n newline separated peaches"
+    }
+]

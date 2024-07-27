@@ -124,6 +124,7 @@ nav:
         - JSON (function calling): reference/json.md
         - JSON mode: reference/json_mode.md
         - Grammar: reference/cfg.md
+        - Creating Grammars: reference/creating_grammars.md
         - Custom FSM operations: reference/custom_fsm_ops.md
     - Utilities:
         - Serve with vLLM: reference/serve/vllm.md

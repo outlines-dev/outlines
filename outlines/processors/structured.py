@@ -24,7 +24,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import math
-from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
 
 import torch
 from pydantic import BaseModel
@@ -39,36 +39,41 @@ if TYPE_CHECKING:
     from outlines.models.tokenizer import Tokenizer
 
 
-class FSMLogitsProcessor(OutlinesLogitsProcessor):
-    """Bias generation using a finite state machine.
+class GuideLogitsProcessor(OutlinesLogitsProcessor):
+    """Bias generation using a finite
 
     Attributes
     ----------
     tokenizer
         The tokenizer used to convert tokens to ids.
-    fsm
-        The finite state machine which is used to bias the logits.
+    guide
+        The `outlines.fsm.Guide` which is used to bias the logits.
     """
 
-    def __init__(self, tokenizer: "Tokenizer", fsm: Guide):
-        """A FSM-based logits processor.
+    tokenizer: "Tokenizer"
+    guide: Guide
+    _guide_states: Dict[int, Any]
+    _seq_start_idx: Optional[int]
+
+    def __init__(self, tokenizer: "Tokenizer", guide: Guide):
+        """A Guide-based logits processor.
 
         Parameters
         ----------
         tokenizer
             The tokenizer used to convert tokens to ids.
-        fsm
-            The finite state machine which is used to bias the logits.
+        guide
+            The `outlines.fsm.Guide. which is used to bias the logits.
         """
         self.tokenizer = tokenizer
-        self._fsm_states: Dict[int, int] = {hash(tuple([])): 0}
-        self.fsm: Guide = fsm
-        self._seq_start_idx: Optional[int] = None
+        self.guide = guide
+        self._guide_states = {hash(tuple([])): self.guide.initial_state}
+        self._seq_start_idx = None
 
     def process_logits(
         self, input_ids: List[List[int]], logits: torch.Tensor
     ) -> torch.Tensor:
-        """Use the FSM to bias the logits before sampling the next token.
+        """Use the Guide to bias the logits before sampling the next token.
 
         Parameters
         ----------
@@ -91,38 +96,38 @@ class FSMLogitsProcessor(OutlinesLogitsProcessor):
             gen_ids = seq_ids[self._seq_start_idx :]
             curr_state_key = hash(tuple(gen_ids))
 
-            if curr_state_key not in self._fsm_states:
-                prev_state = self._fsm_states[hash(tuple(gen_ids[:-1]))]
-                curr_state = self.fsm.get_next_state(prev_state, gen_ids[-1])
-                self._fsm_states[curr_state_key] = curr_state
+            if curr_state_key not in self._guide_states:
+                prev_state = self._guide_states[hash(tuple(gen_ids[:-1]))]
+                curr_state = self.guide.get_next_state(prev_state, gen_ids[-1])
+                self._guide_states[curr_state_key] = curr_state
 
-            sequence_states.append(self._fsm_states[curr_state_key])
+            sequence_states.append(self._guide_states[curr_state_key])
 
         mask = torch.full_like(logits, -math.inf)
-        for i, fsm_state in enumerate(sequence_states):
-            allowed_tokens = self.fsm.get_next_instruction(fsm_state).tokens
+        for i, guide_state in enumerate(sequence_states):
+            allowed_tokens = self.guide.get_next_instruction(guide_state).tokens
             mask[i, allowed_tokens] = logits[i, allowed_tokens]
 
         return mask
 
-    def copy(self) -> "FSMLogitsProcessor":
+    def copy(self) -> "GuideLogitsProcessor":
         """Return a copy of the logits processor."""
-        return FSMLogitsProcessor(tokenizer=self.tokenizer, fsm=self.fsm.copy())
+        return GuideLogitsProcessor(tokenizer=self.tokenizer, guide=self.guide.copy())
 
 
-class RegexLogitsProcessor(FSMLogitsProcessor):
+class RegexLogitsProcessor(GuideLogitsProcessor):
     """Bias generation based on a regular expression.
 
     Attributes
     ----------
     tokenizer
         The tokenizer used to convert tokens to ids.
-    fsm
-        The finite state machine which is used to bias the logits.
+    guide
+        The `outlines.fsm.RegexGuide. which is used to bias the logits.
     """
 
     def __init__(self, regex_string: str, tokenizer: "Tokenizer"):
-        """Compile the FSM that drives the regex-guided generation.
+        """Compile the RegexGuide that drives the regex-guided generation.
 
         Parameters
         ----------
@@ -131,8 +136,8 @@ class RegexLogitsProcessor(FSMLogitsProcessor):
         tokenizer
             An Outlines tokenizer
         """
-        fsm = RegexGuide(regex_string, tokenizer)
-        super().__init__(tokenizer=tokenizer, fsm=fsm)
+        guide = RegexGuide(regex_string, tokenizer)
+        super().__init__(tokenizer=tokenizer, guide=guide)
 
 
 class JSONLogitsProcessor(RegexLogitsProcessor):
@@ -142,8 +147,8 @@ class JSONLogitsProcessor(RegexLogitsProcessor):
     ----------
     tokenizer
         The tokenizer used to convert tokens to ids.
-    fsm
-        The finite state machine which is used to bias the logits.
+    guide
+        The `outlines.fsm.RegexGuide. which is used to bias the logits.
     """
 
     def __init__(
@@ -152,7 +157,7 @@ class JSONLogitsProcessor(RegexLogitsProcessor):
         tokenizer: "Tokenizer",
         whitespace_pattern: Optional[str] = None,
     ):
-        """Compile the FSM that drives the JSON-guided generation.
+        """Compile the Guide that drives the JSON-guided generation.
 
         Parameters
         ----------
@@ -170,19 +175,21 @@ class JSONLogitsProcessor(RegexLogitsProcessor):
         super().__init__(regex_string=regex_string, tokenizer=tokenizer)
 
 
-class CFGLogitsProcessor(FSMLogitsProcessor):
+class CFGLogitsProcessor(GuideLogitsProcessor):
     """Bias generation based on a context-free grammar.
 
     Attributes
     ----------
     tokenizer
         The tokenizer used to convert tokens to ids.
-    fsm
-        The finite state machine which is used to bias the logits.
+    guide
+        The `outlines.fsm.CFGGuide. which is used to bias the logits.
     """
 
+    guide: CFGGuide
+
     def __init__(self, cfg_str: str, tokenizer: "Tokenizer"):
-        """Compile the FSM that drives the CFG-guided generation.
+        """Compile the CFGGuide that drives the CFG-guided generation.
 
         Parameters
         ----------
@@ -191,5 +198,36 @@ class CFGLogitsProcessor(FSMLogitsProcessor):
         tokenizer
             The tokenizer used to convert tokens to ids.
         """
-        cfg_automata = CFGGuide(cfg_string=cfg_str, tokenizer=tokenizer)
-        super().__init__(tokenizer=tokenizer, fsm=cfg_automata)
+        cfg_guide = CFGGuide(cfg_string=cfg_str, tokenizer=tokenizer)
+        super().__init__(tokenizer=tokenizer, guide=cfg_guide)
+
+    def process_logits(
+        self, input_ids: List[List[int]], logits: torch.Tensor
+    ) -> torch.Tensor:
+        """Same behavior as GuideLogitsProcessor, but uses rejection sampling"""
+        if self._seq_start_idx is None:
+            self._seq_start_idx = len(input_ids[0])
+
+        sequence_states: List = []  # vector of states corresponding to `input_ids`
+
+        for seq_ids in input_ids:
+            gen_ids = seq_ids[self._seq_start_idx :]
+            curr_state_key = hash(tuple(gen_ids))
+
+            if curr_state_key not in self._guide_states:
+                prev_state = self._guide_states[hash(tuple(gen_ids[:-1]))]
+                curr_state = self.guide.get_next_state(prev_state, gen_ids[-1])
+                self._guide_states[curr_state_key] = curr_state
+
+            sequence_states.append(self._guide_states[curr_state_key])
+
+        mask = torch.full_like(logits, -math.inf)
+        for i, guide_state in enumerate(sequence_states):
+            first_legal_token = next(
+                self.guide.iter_valid_token_ids(
+                    guide_state, torch.argsort(logits[i], descending=True)
+                )
+            )
+            mask[i, [first_legal_token]] = logits[i, [first_legal_token]]
+
+        return mask

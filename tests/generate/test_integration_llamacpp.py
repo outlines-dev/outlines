@@ -5,7 +5,6 @@ import pytest
 from pydantic import BaseModel, constr
 
 import outlines.generate as generate
-import outlines.grammars as grammars
 import outlines.models as models
 import outlines.samplers as samplers
 
@@ -243,15 +242,6 @@ def test_llamacpp_json_schema(model):
     assert isinstance(result["bar"], str)
 
 
-def test_llamacpp_cfg(model):
-    prompt = "<|im_start|>user\nOutput a short and valid JSON object with two keys.<|im_end|>\n><|im_start|>assistant\n"
-
-    # remove this statement once cfg is implemented
-    with pytest.raises(NotImplementedError):
-        result = generate.cfg(model, grammars.arithmetic)(prompt, seed=11)
-        assert isinstance(result, str)
-
-
 @pytest.mark.parametrize(
     "repo,model_path,hf_tokenizer_uri",
     [
@@ -319,15 +309,15 @@ def test_RegexGuide_caching(model, temp_cache_dir):
     # These two different models and tokenizers should not have the same state
     # mapping results
     assert (
-        generator.logits_processor.fsm.states_to_token_maps
-        != generator_2.logits_processor.fsm.states_to_token_maps
+        generator.logits_processor.guide.states_to_token_maps
+        != generator_2.logits_processor.guide.states_to_token_maps
     )
 
     generator_3 = generate.regex(model_2, regex, sampler=samplers.greedy())
     assert cache.stats() == (1, 2)
     assert (
-        generator_2.logits_processor.fsm.states_to_token_maps
-        == generator_3.logits_processor.fsm.states_to_token_maps
+        generator_2.logits_processor.guide.states_to_token_maps
+        == generator_3.logits_processor.guide.states_to_token_maps
     )
 
     # Just for fun...
