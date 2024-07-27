@@ -25,7 +25,7 @@ class User(BaseModel):
     id: int
 
 
-model = models.transformers("mistralai/Mistral-7B-v0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 generator = generate.json(model, User)
 result = generator(
     "Create a user profile with the fields name, last_name and id"
@@ -60,7 +60,7 @@ from pydantic import BaseModel
 from outlines import models
 from outlines import generate
 
-model = models.transformers("mistralai/Mistral-7B-v0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 
 schema = """
 {
@@ -70,7 +70,8 @@ schema = """
     "name": {"type": "string"},
     "last_name": {"type": "string"},
     "id": {"type": "integer"}
-  }
+  },
+  "required": ["name", "last_name", "id"]
 }
 """
 
@@ -93,7 +94,7 @@ from outlines import generate
 def add(a: int, b: int):
     return a + b
 
-model = models.transformers("mistralai/Mistral-7B-v0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 generator = generate.json(model, add)
 result = generator("Return two integers named a and b respectively. a is odd and b even.")
 

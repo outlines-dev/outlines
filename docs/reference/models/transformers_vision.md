@@ -2,9 +2,10 @@
 
 Outlines allows seamless use of [vision models](https://huggingface.co/learn/computer-vision-course/en/unit4/multimodal-models/tasks-models-part1).
 
-`outlines.models.transformers_vision` has shares interfaces with, and is based on [`outlines.models.transformers`](./transformers.md).
+`outlines.models.transformers_vision` has shares interfaces with, and is based on [outlines.models.transformers](./transformers.md).
 
 Tasks supported include
+
 - image + text -> text
 - video + text -> text
 

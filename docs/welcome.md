@@ -170,7 +170,6 @@ Outlines would not be what it is today without a community of dedicated develope
 Outlines was originally developed at [@NormalComputing](https://twitter.com/NormalComputing) by [@remilouf](https://twitter.com/remilouf) and [@BrandonTWillard](https://twitter.com/BrandonTWillard). It is now maintained by [.txt](https://dottxt.co).
 
 
-
 [discord]: https://discord.gg/R9DSu34mGd
 [aesara]: https://github.com/aesara-devs
 [blackjax]: https://github.com/blackjax-devs/blackjax

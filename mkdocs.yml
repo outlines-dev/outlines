@@ -58,7 +58,11 @@ markdown_extensions:
       pygments_lang_class: true
       noclasses: True
       pygments_style: nord
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.inlinehilite
@@ -115,30 +119,32 @@ nav:
   - Docs:
     - reference/index.md
     - Generation:
+        - Generation Overview: reference/generation/generation.md
         - Text: reference/text.md
         - Samplers: reference/samplers.md
-    - Structured generation:
-        - Classification: reference/choices.md
-        - Regex: reference/regex.md
-        - Type constraints: reference/format.md
-        - JSON (function calling): reference/json.md
-        - JSON mode: reference/json_mode.md
-        - Grammar: reference/cfg.md
-        - Custom FSM operations: reference/custom_fsm_ops.md
+        - Structured generation:
+            - Classification: reference/generation/choices.md
+            - Regex: reference/generation/regex.md
+            - Type constraints: reference/generation/format.md
+            - JSON (function calling): reference/generation/json.md
+            - Grammar: reference/generation/cfg.md
+            - Custom FSM operations: reference/generation/custom_fsm_ops.md
+            - Structured Generation Technical Explanation: reference/generation/structured_generation_explanation.md
     - Utilities:
         - Serve with vLLM: reference/serve/vllm.md
         - Custom types: reference/types.md
         - Prompt templating: reference/prompting.md
         - Outlines functions: reference/functions.md
     - Models:
+        - Models Overview: reference/models/models.md
         - Open source:
           - Transformers: reference/models/transformers.md
+          - Transformers Vision: reference/models/transformers_vision.md
           - Llama.cpp: reference/models/llamacpp.md
           - vLLM: reference/models/vllm.md
           - TGI: reference/models/tgi.md
           - ExllamaV2: reference/models/exllamav2.md
           - MLX: reference/models/mlxlm.md
-          - Mamba: reference/models/mamba.md
         - API:
             - OpenAI: reference/models/openai.md
   - API Reference:

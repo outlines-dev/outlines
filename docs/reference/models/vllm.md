@@ -13,7 +13,7 @@ Outlines supports models available via vLLM's offline batched inference interfac
 ```python
 from outlines import models
 
-model = models.vllm("mistralai/Mistral-7B-v0.1")
+model = models.vllm("microsoft/Phi-3-mini-4k-instruct")
 ```
 
 Or alternatively:
@@ -22,7 +22,7 @@ Or alternatively:
 import vllm
 from outlines import models
 
-llm = vllm.LLM("mistralai/Mistral-7B-v0.1")
+llm = vllm.LLM("microsoft/Phi-3-mini-4k-instruct")
 model = models.VLLM(llm)
 ```
 
@@ -41,7 +41,7 @@ You can pass any parameter that you would normally pass to `vllm.LLM`, as keywor
 from outlines import models
 
 model = models.vllm(
-    "mistralai/Mistral-7B-v0.1",
+    "microsoft/Phi-3-mini-4k-instruct",
     trust_remote_code=True,
     gpu_memory_utilization=0.7
 )
@@ -94,7 +94,7 @@ To run multi-GPU inference with vLLM you need to set the `tensor_parallel_size` 
 from outlines import models
 
 model = models.vllm(
-    "mistralai/Mistral-7B-v0.1"
+    "microsoft/Phi-3-mini-4k-instruct"
     tensor_parallel_size=2
 )
 ```
@@ -120,7 +120,7 @@ from vllm.sampling_params import SamplingParams
 from outlines import models, generate
 
 
-model = models.vllm("mistralai/Mistral-7b-v0.1")
+model = models.vllm("microsoft/Phi-3-mini-4k-instruct")
 generator = generate.text(model)
 
 params = SamplingParams(n=2, frequency_penalty=1., min_tokens=2)

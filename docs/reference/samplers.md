@@ -10,7 +10,7 @@ Outlines defaults to the multinomial sampler without top-p or top-k sampling, an
 from outlines import models, generate, samplers
 
 
-model = models.transformers("mistralai/Mistral-7B-0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 sampler = samplers.multinomial()
 
 generator = generate.text(model, sampler)
@@ -26,7 +26,7 @@ You can ask the generator to take multiple samples by passing the number of samp
 from outlines import models, generate, samplers
 
 
-model = models.transformers("mistralai/Mistral-7B-0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 sampler = samplers.multinomial(3)
 
 generator = generate.text(model, sampler)
@@ -42,7 +42,7 @@ If you ask multiple samples for a batch of prompt the returned array will be of 
 from outlines import models, generate, samplers
 
 
-model = models.transformers("mistralai/Mistral-7B-0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 sampler = samplers.multinomial(3)
 
 generator = generate.text(model, sampler)
@@ -78,7 +78,7 @@ You can also use the greedy sampler. For this you need to initialize the generat
 from outlines import models, generate, samplers
 
 
-model = models.transformers("mistralai/Mistral-7B-0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 sampler = samplers.greedy()
 
 generator = generate.text(model, sampler)
@@ -99,7 +99,7 @@ Outlines also comes with the Beam Search sampling algorithm:
 from outlines import models, generate, samplers
 
 
-model = models.transformers("mistralai/Mistral-7B-Instruct-v0.2")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 sampler = samplers.beam_search(beams=5)
 
 generator = generate.text(model, sampler)

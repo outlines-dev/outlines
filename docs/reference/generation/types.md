@@ -46,7 +46,7 @@ class Client(BaseModel):
     zip_code: locale.ZipCode
 
 
-model = models.transformers("mistralai/Mistral-7B-v0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 generator = generate.json(model, Client)
 result = generator(
     "Create a client profile with the fields name, phone_number and zip_code"
@@ -63,7 +63,7 @@ from pydantic import BaseModel
 from outlines import models, generate, types
 
 
-model = models.transformers("mistralai/Mistral-7B-v0.1")
+model = models.transformers("microsoft/Phi-3-mini-4k-instruct")
 generator = generate.format(model, types.locale("us").PhoneNumber)
 result = generator(
     "Return a US Phone number: "

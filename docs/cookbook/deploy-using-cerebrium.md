@@ -50,7 +50,7 @@ Running code in Cerebrium is like writing normal python with no special syntax. 
 import outlines
 
 
-model = outlines.models.transformers("mistralai/Mistral-7B-Instruct-v0.2")
+model = outlines.models.transformers("microsoft/Phi-3-mini-4k-instruct")
 
 schema = """{
     "title": "Character",
