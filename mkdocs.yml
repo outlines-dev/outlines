@@ -4,7 +4,6 @@ site_author: The Outlines developers
 site_description: >-
   Structured text generation with LLMs
 
-
 # Repository
 repo_name: outlines-dev/outlines
 repo_url: https://github.com/outlines-dev/outlines
@@ -67,7 +66,6 @@ markdown_extensions:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
-
 extra_css:
   - stylesheets/extra.css
 
@@ -112,49 +110,78 @@ nav:
           - BentoML: cookbook/deploy-using-bentoml.md
           - Cerebrium: cookbook/deploy-using-cerebrium.md
           - Modal: cookbook/deploy-using-modal.md
+      - Prompting Techniques:
+          - cookbook/prompting-techniques/index.md
+          - cookbook/prompting-techniques/analogical-prompting.md
+          - cookbook/prompting-techniques/autoprompt.md
+          - cookbook/prompting-techniques/chain-of-thought-cot-prompting.md
+          - cookbook/prompting-techniques/consistency-based-self-adaptive-prompting-cosp.md
+          - cookbook/prompting-techniques/contrastive-cot-prompting.md
+          - cookbook/prompting-techniques/cumulative-reasoning.md
+          - cookbook/prompting-techniques/decomposed-prompting-decomp.md
+          - cookbook/prompting-techniques/demonstration-ensembling-dense.md
+          - cookbook/prompting-techniques/dialogue-comprised-policy-gradient-based-discrete-prompt-optimization-dp2o.md
+          - cookbook/prompting-techniques/diverse-diversity-focused-self-consistency.md
+          - cookbook/prompting-techniques/emotion-prompting.md
+          - cookbook/prompting-techniques/max-mutual-information-method.md
+          - cookbook/prompting-techniques/meta-prompting.md
+          - cookbook/prompting-techniques/prompt-mining.md
+          - cookbook/prompting-techniques/re-reading-re2.md
+          - cookbook/prompting-techniques/reversing-chain-of-thought-rcot.md
+          - cookbook/prompting-techniques/self-ask.md
+          - cookbook/prompting-techniques/self-calibration.md
+          - cookbook/prompting-techniques/self-consistency.md
+          - cookbook/prompting-techniques/self-generated-in-context-learning-sg-icl.md
+          - cookbook/prompting-techniques/self-refine.md
+          - cookbook/prompting-techniques/simtom-simulation-theory-of-mind.md
+          - cookbook/prompting-techniques/skeleton-of-thought.md
+          - cookbook/prompting-techniques/system-2-attention-s2a.md
+          - cookbook/prompting-techniques/universal-self-adaptive-prompting-usp.md
+          - cookbook/prompting-techniques/zero-shot-chain-of-thought-cot.md
+          - cookbook/prompting-techniques/zero-shot-prompting.md
   - Docs:
-    - reference/index.md
-    - Generation:
-        - Text: reference/text.md
-        - Samplers: reference/samplers.md
-    - Structured generation:
-        - Classification: reference/choices.md
-        - Regex: reference/regex.md
-        - Type constraints: reference/format.md
-        - JSON (function calling): reference/json.md
-        - JSON mode: reference/json_mode.md
-        - Grammar: reference/cfg.md
-        - Custom FSM operations: reference/custom_fsm_ops.md
-    - Utilities:
-        - Serve with vLLM: reference/serve/vllm.md
-        - Custom types: reference/types.md
-        - Prompt templating: reference/prompting.md
-        - Outlines functions: reference/functions.md
-    - Models:
-        - Open source:
-          - Transformers: reference/models/transformers.md
-          - Llama.cpp: reference/models/llamacpp.md
-          - vLLM: reference/models/vllm.md
-          - TGI: reference/models/tgi.md
-          - ExllamaV2: reference/models/exllamav2.md
-          - MLX: reference/models/mlxlm.md
-          - Mamba: reference/models/transformers.md
-        - API:
-            - OpenAI: reference/models/openai.md
+      - reference/index.md
+      - Generation:
+          - Text: reference/text.md
+          - Samplers: reference/samplers.md
+      - Structured generation:
+          - Classification: reference/choices.md
+          - Regex: reference/regex.md
+          - Type constraints: reference/format.md
+          - JSON (function calling): reference/json.md
+          - JSON mode: reference/json_mode.md
+          - Grammar: reference/cfg.md
+          - Custom FSM operations: reference/custom_fsm_ops.md
+      - Utilities:
+          - Serve with vLLM: reference/serve/vllm.md
+          - Custom types: reference/types.md
+          - Prompt templating: reference/prompting.md
+          - Outlines functions: reference/functions.md
+      - Models:
+          - Open source:
+              - Transformers: reference/models/transformers.md
+              - Llama.cpp: reference/models/llamacpp.md
+              - vLLM: reference/models/vllm.md
+              - TGI: reference/models/tgi.md
+              - ExllamaV2: reference/models/exllamav2.md
+              - MLX: reference/models/mlxlm.md
+              - Mamba: reference/models/transformers.md
+          - API:
+              - OpenAI: reference/models/openai.md
   - API Reference:
-    - api/index.md
-    - api/models.md
-    - api/prompts.md
-    - api/json_schema.md
-    - api/guide.md
-    - api/parsing.md
-    - api/regex.md
-    - api/samplers.md
+      - api/index.md
+      - api/models.md
+      - api/prompts.md
+      - api/json_schema.md
+      - api/guide.md
+      - api/parsing.md
+      - api/regex.md
+      - api/samplers.md
   - Community:
-    - community/index.md
-    - Feedback 🫶: community/feedback.md
-    - Chat with us ☕: https://discord.com/invite/R9DSu34mGd
-    - How to contribute 🏗️: community/contribute.md
-    - Your projects 👏: community/examples.md
-    - Versioning Guide 📌: community/versioning.md
+      - community/index.md
+      - Feedback 🫶: community/feedback.md
+      - Chat with us ☕: https://discord.com/invite/R9DSu34mGd
+      - How to contribute 🏗️: community/contribute.md
+      - Your projects 👏: community/examples.md
+      - Versioning Guide 📌: community/versioning.md
   - Blog: blog/index.md
