@@ -2,7 +2,8 @@ import json as pyjson
 from functools import singledispatch
 from typing import Callable, Optional, Union
 
-from pydantic import BaseModel
+from jsonschema.protocols import Validator
+from pydantic import BaseModel, create_model
 
 from outlines.fsm.json_schema import build_regex_from_schema, get_schema_from_signature
 from outlines.generate.api import SequenceGeneratorAdapter
@@ -71,8 +72,37 @@ def json(
 @json.register(OpenAI)
 def json_openai(
     model, schema_object: Union[str, object, Callable], sampler: Sampler = multinomial()
-):
-    raise NotImplementedError(
-        "Cannot use JSON Schema-structure generation with an OpenAI model "
-        + "due to the limitations of the OpenAI API"
-    )
+) -> Callable:
+    response_model = None
+    if not isinstance(sampler, multinomial):
+        raise NotImplementedError(
+            r"The OpenAI API does not support any other sampling algorithm "
+            + "that the multinomial sampler."
+        )
+    if isinstance(schema_object, type(BaseModel)):
+        response_model = schema_object
+        schema = schema_object.model_json_schema()
+    elif callable(schema_object):
+        schema = get_schema_from_signature(schema_object)
+    elif isinstance(schema_object, str):
+        schema = pyjson.loads(schema_object)
+        Validator.check_schema(schema)
+    else:
+        raise ValueError(
+            f"Cannot parse schema {schema_object}. The schema must be either "
+            + "a Pydantic object, a function or a string that contains the JSON "
+            + "Schema specification"
+        )
+    if response_model is None:
+        response_model = create_model(schema)
+
+    def generate_json(prompt: str, max_tokens: int = 1000, max_retries=3):
+        response = model.generate_json(prompt, schema, max_tokens)
+        # parse the  response to pydantic object
+        try:
+            if response_model:
+                return response_model.model_validate_json(response)
+        except Exception as e:
+            raise e
+
+    return generate_json
