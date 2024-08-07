@@ -45,6 +45,10 @@ extra:
   analytics:
     provider: google
     property: !ENV GOOGLE_ANALYTICS_KEY
+  version:
+    provider: mike
+    default: latest
+    alias: true
 
 # Extensions
 markdown_extensions:

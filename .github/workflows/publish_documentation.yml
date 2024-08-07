@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  release:
+    types:
+      - created
 
 permissions:
   contents: write
@@ -13,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v4
         with:
           python-version: 3.x
@@ -24,7 +29,24 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - run: pip install -r requirements-doc.txt
-      - name: Build documentation
+      - run: mkdocs build
+
+      - name: Set up Git
+        run: |
+          git config user.name ${{ github.actor }}
+          git config user.email ${{ github.actor }}@users.noreply.github.com
+
+      - name: Publish Tag as latest
         env:
           GOOGLE_ANALYTICS_KEY: ${{ secrets.GOOGLE_ANALYTICS_KEY }}
-        run: mkdocs gh-deploy --force
+        if: github.event_name == 'release'
+        run: |
+          mike deploy --push --update-aliases ${{ github.ref_name }} latest
+          mike set-default --push latest
+
+      - name: Publish main as unstable
+        env:
+          GOOGLE_ANALYTICS_KEY: ${{ secrets.GOOGLE_ANALYTICS_KEY }}
+        if: github.event_name == 'push'
+        run: |
+          mike deploy --push --update-aliases ${{ github.ref_name }} unstable
