@@ -29,3 +29,10 @@ class Tokenizer(Hashable, Protocol):
         token that includes `Ġ` with a string.
         """
         ...
+
+    def apply_chat_template(
+        self,
+        prompt_or_conversation: Union[str, List[Dict[str, str]]],
+    ) -> str:
+        """Apply a chat template to a prompt or conversation."""
+        ...

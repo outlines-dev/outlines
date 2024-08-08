@@ -1,6 +1,6 @@
 import dataclasses
 import inspect
-from typing import TYPE_CHECKING, Iterator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Tuple, Union
 
 from datasets.fingerprint import Hasher
 
@@ -9,7 +9,11 @@ from outlines.models.tokenizer import Tokenizer
 
 if TYPE_CHECKING:
     import torch
-    from transformers import PreTrainedModel, PreTrainedTokenizer
+    from transformers import (
+        PreTrainedModel,
+        PreTrainedTokenizer,
+        PreTrainedTokenizerFast,
+    )
 
     from outlines.processors import OutlinesLogitsProcessor
 
@@ -64,7 +68,11 @@ def get_llama_tokenizer_types():
 class TransformerTokenizer(Tokenizer):
     """Represents a tokenizer for models in the `transformers` library."""
 
-    def __init__(self, tokenizer: "PreTrainedTokenizer", **kwargs):
+    def __init__(
+        self,
+        tokenizer: Union["PreTrainedTokenizer", "PreTrainedTokenizerFast"],
+        **kwargs,
+    ):
         self.tokenizer = tokenizer
         self.eos_token_id = self.tokenizer.eos_token_id
         self.eos_token = self.tokenizer.eos_token
@@ -80,6 +88,14 @@ class TransformerTokenizer(Tokenizer):
 
         self.vocabulary = self.tokenizer.get_vocab()
         self.is_llama = isinstance(self.tokenizer, get_llama_tokenizer_types())
+
+        # set to None if no system message
+        self.SYSTEM_MESSAGE = {
+            "role": "system",
+            "content": "You are a helpful assistant.",
+        }
+        self.USER_MESSAGE_TEMPLATE = lambda x: {"role": "user", "content": x}
+        self.ASSISTANT_MESSAGE_TEMPLATE = lambda x: {"role": "assistant", "content": x}
 
     def encode(
         self, prompt: Union[str, List[str]], **kwargs
@@ -104,6 +120,28 @@ class TransformerTokenizer(Tokenizer):
                 return " " + string
 
         return string
+
+    def format_prompt_into_conversation(self, prompt: str) -> List[Dict[str, str]]:
+        """
+        Template for one-turn chat.
+        """
+        return (
+            [self.SYSTEM_MESSAGE.copy(), self.USER_MESSAGE_TEMPLATE(prompt)]
+            if self.SYSTEM_MESSAGE is not None
+            else [self.USER_MESSAGE_TEMPLATE(prompt)]
+        )
+
+    def apply_chat_template(
+        self, prompt_or_conversation: Union[str, List[Dict[str, str]]]
+    ) -> str:
+        if isinstance(prompt_or_conversation, str):
+            prompt_or_conversation = self.format_prompt_into_conversation(
+                prompt_or_conversation
+            )
+
+        return self.tokenizer.apply_chat_template(
+            prompt_or_conversation, tokenize=False, add_generation_prompt=True
+        )
 
     def __eq__(self, other):
         if isinstance(other, type(self)):
@@ -132,7 +170,7 @@ class Transformers:
     def __init__(
         self,
         model: "PreTrainedModel",
-        tokenizer: "PreTrainedTokenizer",
+        tokenizer: Union["PreTrainedTokenizer", "PreTrainedTokenizerFast"],
     ):
         self.model = model
         self.tokenizer = TransformerTokenizer(tokenizer)

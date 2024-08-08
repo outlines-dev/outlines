@@ -83,6 +83,12 @@ class LlamaCppTokenizer(Tokenizer):
         else:
             return token
 
+    def apply_chat_template(
+        self,
+        prompt_or_conversation: Union[str, List[Dict[str, str]]],
+    ) -> str:
+        raise NotImplementedError("Chat templates are not yet supported by llama-cpp")
+
     def __eq__(self, other):
         if not isinstance(other, LlamaCppTokenizer):
             return False
