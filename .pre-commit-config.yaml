@@ -30,4 +30,4 @@ repos:
     - id: mypy
       args: [--allow-redefinition]
       exclude: ^examples/
-      additional_dependencies: [types-tqdm]
+      additional_dependencies: [types-tqdm, types-Pillow]

@@ -75,10 +75,10 @@ class TransformersVision(Transformers):
 
 def transformers_vision(
     model_name: str,
+    model_class,
     device: Optional[str] = None,
     model_kwargs: dict = {},
     processor_kwargs: dict = {},
-    model_class=None,
     tokenizer_class=None,
     processor_class=None,
 ):
@@ -88,6 +88,9 @@ def transformers_vision(
     ----------
     model_name
         The name of the model as listed on Hugging Face's model page.
+    model_class
+        The `PreTrainedModel` class from transformers to use in initializing the vision model from `model_name`.
+        https://huggingface.co/docs/transformers/main/en/main_classes/model#transformers.PreTrainedModel
     device
         The device(s) on which the model should be loaded. This overrides
         the `device_map` entry in `model_kwargs` when provided.
@@ -103,21 +106,17 @@ def transformers_vision(
     A `TransformersModel` model instance.
 
     """
-    if model_class is None or tokenizer_class is None:
+    if processor_class is None or tokenizer_class is None:
         try:
-            from transformers import (
-                AutoTokenizer,
-                LlavaNextForConditionalGeneration,
-                LlavaNextProcessor,
-            )
+            from transformers import AutoProcessor, AutoTokenizer
         except ImportError:
             raise ImportError(
                 "The `transformers` library needs to be installed in order to use `transformers` models."
             )
-    if model_class is None:
-        model_class = LlavaNextForConditionalGeneration
     if processor_class is None:
-        processor_class = LlavaNextProcessor
+        processor_class = AutoProcessor
+    if tokenizer_class is None:
+        tokenizer_class = AutoTokenizer
 
     if device is not None:
         model_kwargs["device_map"] = device

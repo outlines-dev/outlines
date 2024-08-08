@@ -57,9 +57,11 @@ def model_bart(tmp_path_factory):
 @pytest.fixture(scope="session")
 def model_transformers_vision(tmp_path_factory):
     import torch
+    from transformers import LlavaNextForConditionalGeneration
 
     return models.transformers_vision(
         "llava-hf/llava-v1.6-mistral-7b-hf",
+        model_class=LlavaNextForConditionalGeneration,
         device="cuda",
         model_kwargs=dict(
             torch_dtype=torch.bfloat16,
