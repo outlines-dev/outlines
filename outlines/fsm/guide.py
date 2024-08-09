@@ -1,3 +1,4 @@
+import functools
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -116,7 +117,7 @@ class StopAtEOSGuide(Guide):
         return self
 
 
-@cache()
+@functools.lru_cache(maxsize=128)
 def create_states_mapping(
     regex_string: str,
     tokenizer: "Tokenizer",
