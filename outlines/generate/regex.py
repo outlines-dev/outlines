@@ -49,20 +49,6 @@ def regex_vision(
     return VisionSequenceGeneratorAdapter(model, logits_processor, sampler)
 
 
-@regex.register(ExLlamaV2Model)
-def regex_exllamav2(
-    model,
-    regex_str: str,
-    sampler: Sampler = multinomial(),
-) -> SequenceGenerator:
-    fsm = RegexGuide(regex_str, model.tokenizer)
-
-    device = model.device
-    generator = SequenceGenerator(fsm, model, sampler, device)
-
-    return generator
-
-
 @regex.register(OpenAI)
 def regex_openai(
     model: OpenAI,

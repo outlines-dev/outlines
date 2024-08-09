@@ -36,13 +36,6 @@ def text(model, sampler: Sampler = multinomial()) -> SequenceGeneratorAdapter:
     return SequenceGeneratorAdapter(model, None, sampler)
 
 
-@text.register(ExLlamaV2Model)
-def text_exllamav2(model, sampler: Sampler = multinomial()) -> SequenceGenerator:
-    fsm = StopAtEOSGuide(model.tokenizer)
-    device = model.device
-    return SequenceGenerator(fsm, model, sampler, device)
-
-
 @text.register(TransformersVision)
 def text_vision(model, sampler: Sampler = multinomial()):
     return VisionSequenceGeneratorAdapter(model, None, sampler)

@@ -30,13 +30,3 @@ def fsm_vision(model, fsm: interegular.fsm.FSM, sampler: Sampler = multinomial()
     fsm = RegexGuide.from_interegular_fsm(fsm, model.tokenizer)
     logits_processor = FSMLogitsProcessor(tokenizer=model.tokenizer, fsm=fsm)
     return VisionSequenceGeneratorAdapter(model, logits_processor, sampler)
-
-
-@fsm.register(ExLlamaV2Model)
-def fsm_exllamav2(
-    model, fsm: interegular.fsm.FSM, sampler: Sampler = multinomial()
-) -> SequenceGenerator:
-    fsm = RegexGuide.from_interegular_fsm(fsm, model.tokenizer)
-    device = model.device
-    generator = SequenceGenerator(fsm, model, sampler, device)
-    return generator
