@@ -30,8 +30,7 @@ import torch
 from pydantic import BaseModel
 
 from outlines.fsm.guide import CFGGuide, Guide, RegexGuide
-from outlines.fsm.json_schema import build_regex_from_schema
-from outlines.integrations.utils import convert_json_schema_to_str
+from outlines.fsm.json_schema import build_regex_from_schema, convert_json_schema_to_str
 
 from .base_logits_processor import OutlinesLogitsProcessor
 

@@ -18,8 +18,8 @@ from outlines.fsm.regex import (
     reduced_vocabulary,
     walk_fsm,
 )
-from outlines.integrations.utils import adapt_tokenizer
 from outlines.models.transformers import TransformerTokenizer
+from outlines.models.vllm import adapt_tokenizer
 
 
 def identity(s):

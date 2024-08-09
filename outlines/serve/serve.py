@@ -35,12 +35,14 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 from vllm.sampling_params import SamplingParams
 from vllm.utils import random_uuid
 
-from outlines.integrations.vllm import JSONLogitsProcessor, RegexLogitsProcessor
+from outlines.models.vllm import adapt_tokenizer
+from outlines.processors.structured import JSONLogitsProcessor, RegexLogitsProcessor
 
 TIMEOUT_KEEP_ALIVE = 5  # seconds.
 TIMEOUT_TO_PREVENT_DEADLOCK = 1  # seconds.
 app = FastAPI()
 engine = None
+tokenizer = None
 
 
 @app.get("/health")
@@ -69,9 +71,9 @@ async def generate(request: Request) -> Response:
     json_schema = request_dict.pop("schema", None)
     regex_string = request_dict.pop("regex", None)
     if json_schema is not None:
-        logits_processors = [JSONLogitsProcessor(json_schema, engine.engine)]
+        logits_processors = [JSONLogitsProcessor(json_schema, tokenizer)]
     elif regex_string is not None:
-        logits_processors = [RegexLogitsProcessor(regex_string, engine.engine)]
+        logits_processors = [RegexLogitsProcessor(regex_string, tokenizer)]
     else:
         logits_processors = []
 
@@ -124,6 +126,7 @@ if __name__ == "__main__":
 
     # Sets default for the model (`facebook/opt-125m`)
     engine = AsyncLLMEngine.from_engine_args(engine_args)
+    tokenizer = adapt_tokenizer(tokenizer=engine.engine.tokenizer.tokenizer)
 
     uvicorn.run(
         app,
