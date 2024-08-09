@@ -447,6 +447,49 @@ class PartialParserState(ParserState):
                 if is_end and state_stack[-1] == end_state:
                     return
 
+    def feed_eof(self):
+        last_token = self.lexer.state.last_token
+
+        if last_token is None:
+            eof_token = self.lexer._Token("$END", "", 0, 1, 1)
+        else:
+            eof_token = Token.new_borrow_pos("$END", "", last_token)
+
+        new_token_is_legal = (
+            last_token is None
+            or last_token.type != "partial"
+            or any(ti.is_final for ti in last_token.value.terminals_and_info)
+        )
+        if new_token_is_legal:
+            self.feed_token(eof_token, is_end=True)
+        else:
+            raise UnexpectedToken(eof_token, [], state=self, interactive_parser=None)
+
+    def choices(self):
+        return self.parse_conf.parse_table.states[self.position]
+
+    def accepts(self):
+        """
+        Adapted from https://github.com/lark-parser/lark/blob/be542c2ff6d968817df019b8bf03f37b3111c08c/lark/parsers/lalr_interactive_parser.py#L95
+        Returns the set of possible tokens that will advance the parser into a new valid state.
+        """
+        accepts = set()
+        conf_no_callbacks = copy(self.parse_conf)
+        # We don't want to call callbacks here since those might have arbitrary side effects
+        # and are unnecessarily slow.
+        conf_no_callbacks.callbacks = {}
+        for t in self.choices():
+            if t.isupper():  # is terminal?
+                new_state = copy(self)
+                new_state.parse_conf = conf_no_callbacks
+                try:
+                    new_state.feed_token(new_state.lexer._Token(t, ""))
+                except UnexpectedToken:
+                    pass
+                else:
+                    accepts.add(t)
+        return accepts
+
     def __copy__(self):
         return type(self)(
             self.parse_conf,
@@ -483,12 +526,7 @@ class PartialParser(_Parser):
                 state.feed_token(token)
 
             if is_end and (not token or token.type != "partial"):
-                end_token = (
-                    Token.new_borrow_pos("$END", "", token)
-                    if token
-                    else Token("$END", "", 0, 1, 1)
-                )
-                state.feed_token(end_token, True)
+                state.feed_eof()
 
             return state
         except UnexpectedInput as e:
@@ -614,6 +652,8 @@ class PartialContextualLexer(ContextualLexer):
                 lexer_conf.terminals = [
                     terminals_by_name[n] for n in accepts if n in terminals_by_name
                 ]
+                if not lexer_conf.terminals:
+                    continue
                 lexer = PartialBasicLexer(lexer_conf)
                 lexer_by_symbols[key] = lexer
 
@@ -626,9 +666,22 @@ class PartialContextualLexer(ContextualLexer):
         try:
             while True:
                 lexer = self.lexers[parser_state.position]
-                yield lexer.next_token(lexer_state, parser_state)
+                next_tok = lexer.next_token(lexer_state, parser_state)
+                yield next_tok
         except EOFError:
             pass
+        except KeyError:
+            if len(lexer_state.text) > lexer_state.line_ctr.char_pos:
+                raise UnexpectedCharacters(
+                    lexer_state.text,
+                    lexer_state.line_ctr.char_pos,
+                    lexer_state.line_ctr.line,
+                    lexer_state.line_ctr.column,
+                    allowed=False,
+                    token_history=lexer_state.last_token and [lexer_state.last_token],
+                    state=parser_state,
+                    terminals_by_name=self.root_lexer.terminals,
+                )
 
 
 class PartialBasicLexer(BasicLexer):

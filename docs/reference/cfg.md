@@ -30,10 +30,15 @@ print(sequence)
 # (8-2)
 ```
 
-!!! Note "Performance"
+###### Disclaimer
 
-    The implementation of grammar-structured generation in Outlines is very naive. This does not reflect the performance of [.txt](https://dottxt.co)'s product, where we made grammar-structured generation as fast as regex-structured generation.
+!!! Note "Experimental"
 
+    Outlines current **community-contributed** implementation of CFG-structured generation is experimental. This does not reflect the performance of [.txt](https://dottxt.co)'s product, where we have optimized grammar-structured generation to be as fast as regex-structured generation. Additionally, it does not fully align with the approach described in our [technical report](https://arxiv.org/pdf/2307.09702), aside from its use of incremental/partial parsing. This feature is still a work in progress, requiring performance enhancements and bug fixes for an ideal implementation. For more details, please see our [grammar-related open issues on GitHub](https://github.com/outlines-dev/outlines/issues?q=is%3Aissue+is%3Aopen+label%3Agrammar).
+
+!!! Note "Greedy"
+
+    To mitigate performance issues, CFG-structured generation will use rejection sampling and iterate over the candidate tokens highest logit first,, completing once a single valid token ID is selected. This is effectively greedy generation.
 
 ## Ready-to-use grammars
 

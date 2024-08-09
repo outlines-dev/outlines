@@ -524,15 +524,15 @@ def test_RegexGuide_caching(temp_cache_dir):
     # These two different models and tokenizers should not have the same state
     # mapping results
     assert (
-        generator.logits_processor.fsm.states_to_token_maps
-        != generator_2.logits_processor.fsm.states_to_token_maps
+        generator.logits_processor.guide.states_to_token_maps
+        != generator_2.logits_processor.guide.states_to_token_maps
     )
 
     generator_3 = generate.regex(model_2, regex, sampler=greedy())
     assert cache.stats() == (1, 2)
     assert (
-        generator_2.logits_processor.fsm.states_to_token_maps
-        == generator_3.logits_processor.fsm.states_to_token_maps
+        generator_2.logits_processor.guide.states_to_token_maps
+        == generator_3.logits_processor.guide.states_to_token_maps
     )
 
     # Just for fun...
