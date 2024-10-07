@@ -16,4 +16,4 @@ from .transformers import Transformers, TransformerTokenizer, mamba, transformer
 from .transformers_vision import TransformersVision, transformers_vision
 from .vllm import VLLM, vllm
 
-LogitsGenerator = Union[Transformers, LlamaCpp, ExLlamaV2Model, MLXLM, VLLM]
+LogitsGenerator = Union[Transformers, LlamaCpp, OpenAI, ExLlamaV2Model, MLXLM, VLLM]
