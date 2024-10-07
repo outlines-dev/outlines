@@ -32,12 +32,15 @@ DATE_TIME = r'"(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0
 DATE = r'"(?:\d{4})-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1-2][0-9]|3[0-1])"'
 TIME = r'"(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\\.[0-9]+)?(Z)?"'
 UUID = r'"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"'
+# URI only supports a subset of https://datatracker.ietf.org/doc/html/rfc3986, specifically https:// URLs with optional auth details
+URI = r'"(https?:\/\/)?([-a-zA-Z0-9:%._\+~#=]+@)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}([-a-zA-Z0-9@:%_\+.~#?&//=]*)"'
 
 format_to_regex = {
     "uuid": UUID,
     "date-time": DATE_TIME,
     "date": DATE,
     "time": TIME,
+    "uri": URI,
 }
 
 
@@ -350,14 +353,8 @@ def to_regex(
                     return rf'("{pattern}")'
             elif "format" in instance:
                 format = instance["format"]
-                if format == "date-time":
-                    return format_to_regex["date-time"]
-                elif format == "uuid":
-                    return format_to_regex["uuid"]
-                elif format == "date":
-                    return format_to_regex["date"]
-                elif format == "time":
-                    return format_to_regex["time"]
+                if format in format_to_regex:
+                    return format_to_regex[format]
                 else:
                     raise NotImplementedError(
                         f"Format {format} is not supported by Outlines"

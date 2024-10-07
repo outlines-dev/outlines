@@ -16,6 +16,7 @@ from outlines.fsm.json_schema import (
     STRING,
     STRING_INNER,
     TIME,
+    URI,
     UUID,
     WHITESPACE,
     build_regex_from_schema,
@@ -744,6 +745,51 @@ def test_match_number(pattern, does_match):
                 ('{ "name" : "Player", "age" : 10, "strength" : 10 }', True),
                 ('{ "age" : 10, "strength" : 10 }', True),
                 ("{ }", True),
+            ],
+        ),
+        # URI
+        (
+            {"title": "Foo", "type": "string", "format": "uri"},
+            URI,
+            [
+                ('"https://www.example.com"', True),
+                ('"http://example.com"', True),
+                ('"https://subdomain.example.co.uk/path?query=value#fragment"', True),
+                ('"https://example.com:8080"', True),  # With port
+                ('"http://123.45.67.89"', True),  # IP address
+                (
+                    '"https://example.com/path/to/resource.html"',
+                    True,
+                ),  # With file extension
+                ('"https://user:pass@example.com"', True),  # With basic auth
+                (
+                    '"https://example.com/?q=test&r=123"',
+                    True,
+                ),  # With multiple query parameters
+                ('"https://example.co.uk"', True),  # Different TLD
+                ('"https://xn--bcher-kva.example"', True),  # Punycode domain
+                ('"https://example.com/path%20with%20spaces"', True),  # Encoded spaces
+                ('"ftp://example.com"', False),  # FTP protocol
+                ('"not a uri"', False),
+                ('"https://"', False),  # Incomplete URI
+                ('""', False),  # Empty string
+                ("https://www.example.com", False),  # Missing quotes
+                ('"http:/example.com"', False),  # Missing slash after protocol
+                ('"https://example.com:abc"', False),  # Invalid port
+                ('"https://exa mple.com"', False),  # Space in domain
+                ('"https://.example.com"', False),  # Domain starting with dot
+                ('"https://example..com"', False),  # Consecutive dots in domain
+                (
+                    '"https://exam ple.com/path"',
+                    False,
+                ),  # Space in domain (but valid path)
+                ('"https://example.com/path "', False),  # Space at end of path
+                ('"https://example.com#frag ment"', False),  # Space in fragment
+                ('"https://example.com/?q=va lue"', False),  # Space in query
+                ('"https://exa\nmple.com"', False),  # Newline in domain
+                ('"https://example.com/pat\nh"', False),  # Newline in path
+                ('"https://example.com#frag\nment"', False),  # Newline in fragment
+                ('"https://example.com/?q=val\nue"', False),  # Newline in query
             ],
         ),
     ],
