@@ -148,7 +148,7 @@ class MultinomialSampler:
 
         altered_next_token_logits = next_token_logits
         for logit_processor in self.logits_processors:
-            altered_next_token_logits = logit_processor(next_token_logits)
+            altered_next_token_logits = logit_processor(altered_next_token_logits)
 
         probs = torch.nn.functional.softmax(altered_next_token_logits, dim=-1)
         next_token_ids = torch.multinomial(probs, num_samples=1, generator=rng)
