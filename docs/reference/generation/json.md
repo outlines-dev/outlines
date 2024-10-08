@@ -42,6 +42,14 @@ print(result)
     generator = generate.json(model, User, whitespace_pattern=r"[\n\t ]*")
     ```
 
+!!! Note "Non-Strict Mode"
+    Because models may exhaust their context window before a valid schema is generated, an error resulting from from an invalid generation may occur. This is particularly troublesome when an error interrupts a batch workload. To ensure `generate.json` returns a dict containing error details for invalid sequences rather than raising an error, use the following:
+
+    ```python
+    generator = generate.json(model, User, strict=False)
+    ```
+
+
 !!! Note "Performance"
 
     `generation.json` computes an index that helps Outlines guide generation. This can take some time, but only needs to be done once. If you want to generate several times with the same schema make sure that you only call `generate.json` once.

@@ -18,6 +18,7 @@ def json(
     schema_object: Union[str, object, Callable],
     sampler: Sampler = multinomial(),
     whitespace_pattern: Optional[str] = None,
+    strict=True,
 ) -> SequenceGeneratorAdapter:
     """
     Generate structured JSON data with a `Transformer` model based on a specified JSON Schema.
@@ -36,6 +37,10 @@ def json(
     whitespace_pattern
         Pattern to use for JSON syntactic whitespace (doesn't impact string literals)
         Example: allow only a single space or newline with `whitespace_pattern=r"[\n ]?"`
+    strict
+        If strict mode is enabled, generations which don't conform to the schema or aren't
+        valid JSON will result in an error. Outlines guarantees generation complies with a schema,
+        but schemas often allow for infinite repetition and exhaust the model_max_length.
 
     Returns
     -------
@@ -43,21 +48,39 @@ def json(
     transforms the result if BaseModel is used.
 
     """
+
+    def maybe_strict_formatter(formatter):
+        """If strict, use normal formatter. Otherwise, return error dict on failure"""
+        if strict:
+            return formatter
+
+        def allow_fail_formatter(generated_output):
+            try:
+                return formatter(generated_output)
+            except Exception as e:
+                return {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "output": generated_output,
+                }
+
+        return allow_fail_formatter
+
     if isinstance(schema_object, type(BaseModel)):
         schema = pyjson.dumps(schema_object.model_json_schema())
         regex_str = build_regex_from_schema(schema, whitespace_pattern)
         generator = regex(model, regex_str, sampler)
-        generator.format_sequence = lambda x: schema_object.parse_raw(x)
+        generator.format_sequence = maybe_strict_formatter(schema_object.parse_raw)
     elif callable(schema_object):
         schema = pyjson.dumps(get_schema_from_signature(schema_object))
         regex_str = build_regex_from_schema(schema, whitespace_pattern)
         generator = regex(model, regex_str, sampler)
-        generator.format_sequence = lambda x: pyjson.loads(x)
+        generator.format_sequence = maybe_strict_formatter(pyjson.loads)
     elif isinstance(schema_object, str):
         schema = schema_object
         regex_str = build_regex_from_schema(schema, whitespace_pattern)
         generator = regex(model, regex_str, sampler)
-        generator.format_sequence = lambda x: pyjson.loads(x)
+        generator.format_sequence = maybe_strict_formatter(pyjson.loads)
     else:
         raise ValueError(
             f"Cannot parse schema {schema_object}. The schema must be either "
