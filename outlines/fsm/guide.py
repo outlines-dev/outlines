@@ -74,8 +74,8 @@ class StopAtEOSGuide(Guide):
 
 
 @cache()
-def create_states_mapping(regex_string, tokenizer):
-    return uncached_create_states_mapping(regex_string, tokenizer)
+def cached_create_states_mapping(regex_string, tokenizer, *args, **kwargs):
+    return uncached_create_states_mapping(regex_string, tokenizer, *args, **kwargs)
 
 
 class RegexGuide(CoreRegexGuide):
@@ -84,15 +84,20 @@ class RegexGuide(CoreRegexGuide):
     CoreRegexGuide with outlines cache
     """
 
-    def __init__(self, regex_string: str, tokenizer: "Tokenizer"):
-        (
-            self.states_to_token_maps,
-            self.empty_token_ids,
-            fsm_finals,
-        ) = create_states_mapping(regex_string, tokenizer)
-        self.eos_token_id = tokenizer.eos_token_id
-        self.final_states = fsm_finals | {-1}
-        self._cache_state_to_token_tensor()
+    @classmethod
+    def from_regex(
+        cls,
+        regex_string: str,
+        tokenizer,
+        _create_states_mapping=cached_create_states_mapping,
+        **kwargs,
+    ):
+        return super().from_regex(
+            regex_string,
+            tokenizer,
+            _create_states_mapping=_create_states_mapping,
+            **kwargs,
+        )
 
 
 CFGState = collections.namedtuple("CFGState", ["parser_state", "prev_token"])
