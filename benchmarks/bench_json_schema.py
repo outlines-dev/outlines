@@ -77,4 +77,4 @@ class JsonSchemaBenchmark:
     @cache_disabled()
     def time_json_schema_to_fsm(self, schema_name):
         regex = build_regex_from_schema(self.schema)
-        RegexGuide(regex, self.tokenizer)
+        RegexGuide.from_regex(regex, self.tokenizer)

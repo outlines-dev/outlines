@@ -149,7 +149,7 @@ class RegexLogitsProcessor(GuideLogitsProcessor):
         tokenizer
             An Outlines tokenizer
         """
-        guide = RegexGuide(regex_string, tokenizer)
+        guide = RegexGuide.from_regex(regex_string, tokenizer)
         super().__init__(tokenizer=tokenizer, guide=guide)
 
 

@@ -43,7 +43,7 @@ def test_regex_vocabulary_error():
     regex_str = "[1-9]"
 
     with pytest.raises(ValueError, match="The vocabulary"):
-        RegexGuide(regex_str, MockTokenizer())
+        RegexGuide.from_regex(regex_str, MockTokenizer())
 
 
 def test_regex():
@@ -57,7 +57,7 @@ def test_regex():
 
     regex_str = "[1-9]"
     tokenizer = MockTokenizer()
-    fsm = RegexGuide(regex_str, tokenizer)
+    fsm = RegexGuide.from_regex(regex_str, tokenizer)
 
     assert fsm.states_to_token_maps == {0: {1: 1}}
 
@@ -98,7 +98,7 @@ def test_regex_multi_byte_llama_like():
 
     regex_str = "[😁-😎]"
     tokenizer = MockTokenizer()
-    fsm = RegexGuide(regex_str, tokenizer)
+    fsm = RegexGuide.from_regex(regex_str, tokenizer)
 
     assert fsm.states_to_token_maps == {
         0: {5: 1, 4: 2},
@@ -145,7 +145,7 @@ def test_regex_multi_byte_gpt2_like():
 
     regex_str = " [😁-😎]"
     tokenizer = MockTokenizer()
-    fsm = RegexGuide(regex_str, tokenizer)
+    fsm = RegexGuide.from_regex(regex_str, tokenizer)
 
     assert fsm.states_to_token_maps == {
         0: {5: 1, 10: 2},
@@ -180,7 +180,7 @@ def test_regex_final_state():
 
     regex_str = r"`\n(\.\n)?`\n"
     tokenizer = MockTokenizer()
-    fsm = RegexGuide(regex_str, tokenizer)
+    fsm = RegexGuide.from_regex(regex_str, tokenizer)
 
     state = fsm.get_next_state(state=4, token_id=103)
     assert state == 5

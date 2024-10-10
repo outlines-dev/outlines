@@ -25,7 +25,7 @@ class RegexGuideBenchmark:
 
     @cache_disabled()
     def time_regex_to_guide(self, pattern_name):
-        RegexGuide(self.pattern, self.tokenizer)
+        RegexGuide.from_regex(self.pattern, self.tokenizer)
 
 
 class MemoryRegexGuideBenchmark:
@@ -37,4 +37,4 @@ class MemoryRegexGuideBenchmark:
 
     @cache_disabled()
     def peakmem_regex_to_guide(self, pattern_name):
-        RegexGuide(self.pattern, self.tokenizer)
+        RegexGuide.from_regex(self.pattern, self.tokenizer)
