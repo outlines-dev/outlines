@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import os
 import tempfile
 import unittest
@@ -66,6 +67,33 @@ def test_get_cache(test_cache):
 
     f(2)
     assert len(store) == store_size + 1
+
+
+def test_get_cache_from_class_method(test_cache):
+    store = list()
+
+    class DummyObject:
+        @classmethod
+        @test_cache
+        def dummy_function(cls, a):
+            store.append(a)
+            return a
+
+    @dataclass
+    class DummyArg:
+        a: int
+
+    dummy_object = DummyObject()
+
+    a_1 = DummyArg(1)
+
+    dummy_object.dummy_function(a_1)
+    assert len(store) == 1
+    store_size = len(store)
+
+    a_2 = DummyArg(1)
+    dummy_object.dummy_function(a_2)
+    assert len(store) == store_size
 
 
 def test_disable_cache(test_cache):

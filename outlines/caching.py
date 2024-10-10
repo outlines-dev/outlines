@@ -126,7 +126,7 @@ def cache(expire: Optional[float] = None, typed=False, ignore=()):
 
         def __cache_key__(*args, **kwargs):
             """Make key for cache given function arguments."""
-            return args_to_key(base, args, kwargs, typed, ignore)
+            return str(args_to_key(base, args, kwargs, typed, ignore))
 
         wrapper.__cache_key__ = __cache_key__  # type: ignore
         wrapper.__memory__ = memory  # type: ignore
