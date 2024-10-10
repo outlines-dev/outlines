@@ -18,6 +18,7 @@ def json(
     schema_object: Union[str, object, Callable],
     sampler: Sampler = multinomial(),
     whitespace_pattern: Optional[str] = None,
+    safe_subset: bool = True,
 ) -> SequenceGeneratorAdapter:
     """
     Generate structured JSON data with a `Transformer` model based on a specified JSON Schema.
@@ -36,6 +37,14 @@ def json(
     whitespace_pattern
         Pattern to use for JSON syntactic whitespace (doesn't impact string literals)
         Example: allow only a single space or newline with `whitespace_pattern=r"[\n ]?"`
+        Example: allow only a single space or newline with `whitespace_pattern=r"[\n ]?"`
+    safe_subset
+        Use a subset of json schema which performs better with language models.
+        If you want to all the model to generate any json structure, set to False.
+        Changes the following:
+        - If whitespace_pattern is None, sets whitespace pattern to WHITESPACE (r"[ ]?")
+        - If unconstrained integer is used, constrain integer to *roughly* the int64 range [-1e19, 1e19]
+        - If unconstrained string is used, constrain it to max of 256 characters
 
     Returns
     -------
@@ -45,17 +54,17 @@ def json(
     """
     if isinstance(schema_object, type(BaseModel)):
         schema = pyjson.dumps(schema_object.model_json_schema())
-        regex_str = build_regex_from_schema(schema, whitespace_pattern)
+        regex_str = build_regex_from_schema(schema, whitespace_pattern, safe_subset)
         generator = regex(model, regex_str, sampler)
         generator.format_sequence = lambda x: schema_object.parse_raw(x)
     elif callable(schema_object):
         schema = pyjson.dumps(get_schema_from_signature(schema_object))
-        regex_str = build_regex_from_schema(schema, whitespace_pattern)
+        regex_str = build_regex_from_schema(schema, whitespace_pattern, safe_subset)
         generator = regex(model, regex_str, sampler)
         generator.format_sequence = lambda x: pyjson.loads(x)
     elif isinstance(schema_object, str):
         schema = schema_object
-        regex_str = build_regex_from_schema(schema, whitespace_pattern)
+        regex_str = build_regex_from_schema(schema, whitespace_pattern, safe_subset)
         generator = regex(model, regex_str, sampler)
         generator.format_sequence = lambda x: pyjson.loads(x)
     else:

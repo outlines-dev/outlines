@@ -1,5 +1,7 @@
 import json
+import random
 import re
+import string as pystring
 from typing import List, Literal, Union
 
 import interegular
@@ -13,15 +15,20 @@ from outlines.fsm.json_schema import (
     INTEGER,
     NULL,
     NUMBER,
+    SAFE_WHITESPACE,
     STRING,
     STRING_INNER,
     TIME,
     UUID,
-    WHITESPACE,
     build_regex_from_schema,
+    get_int_pattern,
     get_schema_from_signature,
+    get_str_pattern,
     to_regex,
 )
+
+SAFE_INT = get_int_pattern(safe_subset=True)
+SAFE_STR = get_str_pattern(safe_subset=True)
 
 
 def test_function_basic():
@@ -71,7 +78,7 @@ def test_from_pydantic():
 )
 def test_match_integer(pattern, does_match):
     step = {"title": "Foo", "type": "integer"}
-    regex = to_regex(None, step)
+    regex = to_regex(None, step, safe_subset=False)
     assert regex == INTEGER
 
     value = pattern["integer"]
@@ -81,6 +88,102 @@ def test_match_integer(pattern, does_match):
         assert match.span() == (0, len(value))
     else:
         assert match is None
+
+
+@pytest.mark.parametrize(
+    "minimum,maximum",
+    [
+        (0, 0),
+        (-1, 0),
+        (0, 1),
+        (-15, 0),
+        (0, 15),
+        (-1, 1),
+        (-15, 15),
+        (-1234, 56),
+        (-56, 1234),
+        (-9, 9),
+        (-10, 10),
+        (-9, 10),
+        (-10, 9),
+        (123, 199),
+        (123, 456),
+        (5600, 5678),
+        (550, 560),
+        (-12345, 3423),
+        (50, 10000),
+        (0, 1000),
+        (-100000, 0),
+        (-100000, 100000),
+    ],
+)
+def test_int_range_pattern(minimum, maximum):
+    pattern = get_int_pattern(minimum, maximum)
+    fsm = interegular.parse_pattern(pattern).to_fsm().reduce()
+    pattern_numbers = {"".join(s) for s in fsm.strings()}
+    range_numbers = set(map(str, range(minimum, maximum + 1)))
+    if "0" in range_numbers:
+        range_numbers.add("-0")
+    assert pattern_numbers == range_numbers
+
+    # logarithmic space complexity
+    assert len(fsm.states) <= (len(str(minimum)) + len(str(maximum))) * 2
+
+
+def test_int_range_unconstrained():
+    # test unconstrained
+    pattern = get_int_pattern(float("-inf"), float("inf"))
+    fsm = interegular.parse_pattern(pattern).to_fsm().reduce()
+    assert get_int_pattern(None, None) == pattern
+    assert fsm.accepts("0")
+    assert fsm.accepts("-1")
+    assert fsm.accepts("1")
+    assert fsm.accepts("-98427983498234893274983274892")
+    assert fsm.accepts("2994399439493294329432984932")
+
+    assert not fsm.accepts("1.1")
+    assert not fsm.accepts("1.0")
+    assert not fsm.accepts("1.0")
+    assert not fsm.accepts("one")
+
+    assert len(fsm.states) < 5
+
+
+def test_int_range_min_zero():
+    # test min zero
+    pattern = get_int_pattern(0, float("inf"))
+    fsm = interegular.parse_pattern(pattern).to_fsm()
+    assert fsm.accepts("0")
+    assert not fsm.accepts("-1")
+    assert fsm.accepts("1")
+    assert not fsm.accepts("-98427983498234893274983274892")
+    assert fsm.accepts("2994399439493294329432984932")
+
+
+def test_int_range_max_zero():
+    # test min zero
+    pattern = get_int_pattern(-float("inf"), 0)
+    fsm = interegular.parse_pattern(pattern).to_fsm()
+    assert fsm.accepts("0")
+    assert fsm.accepts("-1")
+    assert not fsm.accepts("1")
+    assert fsm.accepts("-98427983498234893274983274892")
+    assert not fsm.accepts("2994399439493294329432984932")
+
+
+def test_int_range_max_minus_32():
+    # test min zero
+    pattern = get_int_pattern(-float("inf"), -32)
+    fsm = interegular.parse_pattern(pattern).to_fsm()
+    assert not fsm.accepts("0")
+    assert not fsm.accepts("-1")
+    assert not fsm.accepts("1")
+    assert not fsm.accepts("32")
+    assert fsm.accepts("-32")
+    assert fsm.accepts("-33")
+    assert fsm.accepts("-39482929438")
+    assert fsm.accepts("-98427983498234893274983274892")
+    assert not fsm.accepts("2994399439493294329432984932")
 
 
 @pytest.mark.parametrize(
@@ -108,6 +211,56 @@ def test_match_number(pattern, does_match):
         assert match.span() == (0, len(value))
     else:
         assert match is None
+
+
+@pytest.mark.parametrize(
+    "min_len,max_len,safe_subset,expected_max,errors",
+    [
+        # if no max and no safe mode, any length allowed
+        (None, None, False, None, False),
+        # max_len is None, use safe max_len of 256
+        (None, None, True, 256, False),
+        (0, None, True, 256, False),
+        # if max_len is specified, it overrides safe_subset rules
+        (None, 500, True, 500, False),
+        (0, 500, True, 500, False),
+        # if min_len specification has no effect
+        (3, 500, True, 500, False),
+        (30, 500, True, 500, False),
+        (300, 500, True, 500, False),
+        # illegal
+        (-1, None, True, None, True),
+        (30, 20, True, None, True),
+    ],
+)
+def test_get_str_pattern(min_len, max_len, safe_subset, expected_max, errors):
+    if errors:
+        with pytest.raises(ValueError):
+            get_str_pattern(min_len, max_len, safe_subset)
+        return
+
+    pattern = get_str_pattern(min_len, max_len, safe_subset)
+
+    # verify str len in (min_len, max_len)
+    def str_of_len(str_len):
+        s = "".join(random.choices(pystring.ascii_letters + pystring.digits, k=str_len))
+        return f'"{s}"'
+
+    # verify min_len held
+    min_len = min_len or 0
+    assert re.match(pattern, str_of_len(min_len))
+    if min_len != 0:
+        assert not re.match(pattern, str_of_len(min_len - 1))
+
+    # verify expected_max accurate
+    if expected_max is not None:
+        assert re.match(pattern, str_of_len(expected_max))
+        assert re.match(pattern, str_of_len(max(expected_max - 1, min_len)))
+        assert not re.match(pattern, str_of_len(expected_max + 1))
+    else:
+        assert re.match(pattern, str_of_len(max(min_len, 100)))
+        assert re.match(pattern, str_of_len(max(min_len, 1000)))
+        assert re.match(pattern, str_of_len(max(min_len, 100000)))
 
 
 @pytest.mark.parametrize(
@@ -267,11 +420,11 @@ def test_match_number(pattern, does_match):
                 "title": "Foo",
                 "type": "object",
                 "properties": {
-                    "count": {"title": "Count", "type": "integer", "minDigits": 3}
+                    "count": {"title": "Count", "type": "integer", "minimum": 100}
                 },
                 "required": ["count"],
             },
-            '\\{[ ]?"count"[ ]?:[ ]?(-)?(0|[1-9][0-9]{2,})[ ]?\\}',
+            '\\{[ ]?"count"[ ]?:[ ]?(([\\d]{4,}|([1-9][0-9]{2})))[ ]?\\}',
             [('{ "count": 10 }', False), ('{ "count": 100 }', True)],
         ),
         # integer with maximum digits
@@ -280,14 +433,14 @@ def test_match_number(pattern, does_match):
                 "title": "Foo",
                 "type": "object",
                 "properties": {
-                    "count": {"title": "Count", "type": "integer", "maxDigits": 3}
+                    "count": {"title": "Count", "type": "integer", "maximum": 999}
                 },
                 "required": ["count"],
             },
-            '\\{[ ]?"count"[ ]?:[ ]?(-)?(0|[1-9][0-9]{,2})[ ]?\\}',
+            '\\{[ ]?"count"[ ]?:[ ]?((-(([\\d]{2,}|([1-9]))))|((0|(([1-9])|([1-9][0-9]{1})|([1-9][0-9]{2})))))[ ]?\\}',
             [('{ "count": 100 }', True), ('{ "count": 1000 }', False)],
         ),
-        # integer with minimum and maximum digits
+        # integer with minimum and maximum
         (
             {
                 "title": "Foo",
@@ -296,13 +449,13 @@ def test_match_number(pattern, does_match):
                     "count": {
                         "title": "Count",
                         "type": "integer",
-                        "minDigits": 3,
-                        "maxDigits": 5,
+                        "minimum": 50,
+                        "maximum": 50000,
                     }
                 },
                 "required": ["count"],
             },
-            '\\{[ ]?"count"[ ]?:[ ]?(-)?(0|[1-9][0-9]{2,4})[ ]?\\}',
+            '\\{[ ]?"count"[ ]?:[ ]?(([5-9][0-9]{1})|([1-9][0-9]{2})|([1-9][0-9]{3})|([1-4][0-9]{4})|(5000[0-0]))[ ]?\\}',
             [
                 ('{ "count": 10 }', False),
                 ('{ "count": 100 }', True),
@@ -420,7 +573,7 @@ def test_match_number(pattern, does_match):
         # array
         (
             {"title": "Foo", "type": "array", "items": {"type": "number"}},
-            rf"\[{WHITESPACE}(({NUMBER})(,{WHITESPACE}({NUMBER})){{0,}})?{WHITESPACE}\]",
+            rf"\[{SAFE_WHITESPACE}(({NUMBER})(,{SAFE_WHITESPACE}({NUMBER})){{0,}})?{SAFE_WHITESPACE}\]",
             [("[1e+9,1.3]", True), ("[]", True), ("[1", False)],
         ),
         # array with a set length of 1
@@ -432,7 +585,7 @@ def test_match_number(pattern, does_match):
                 "minItems": 1,
                 "maxItems": 1,
             },
-            rf"\[{WHITESPACE}(({INTEGER})(,{WHITESPACE}({INTEGER})){{0,0}}){WHITESPACE}\]",
+            rf"\[{SAFE_WHITESPACE}(({INTEGER})(,{SAFE_WHITESPACE}({INTEGER})){{0,0}}){SAFE_WHITESPACE}\]",
             [("[1]", True), ("[1,2]", False), ('["a"]', False), ("[]", False)],
         ),
         # array with a set length greather than 1
@@ -444,7 +597,7 @@ def test_match_number(pattern, does_match):
                 "minItems": 3,
                 "maxItems": 3,
             },
-            rf"\[{WHITESPACE}(({INTEGER})(,{WHITESPACE}({INTEGER})){{2,2}}){WHITESPACE}\]",
+            rf"\[{SAFE_WHITESPACE}(({INTEGER})(,{SAFE_WHITESPACE}({INTEGER})){{2,2}}){SAFE_WHITESPACE}\]",
             [("[1]", False), ("[]", False), ("[1,2,3]", True), ("[1,2,3,4]", False)],
         ),
         # array with length 0
@@ -456,7 +609,7 @@ def test_match_number(pattern, does_match):
                 "minItems": 0,
                 "maxItems": 0,
             },
-            rf"\[{WHITESPACE}\]",
+            rf"\[{SAFE_WHITESPACE}\]",
             [("[1]", False), ("[]", True), ("[1,2,3]", False), ("[1,2,3,4]", False)],
         ),
         # object
@@ -473,7 +626,7 @@ def test_match_number(pattern, does_match):
                 },
                 "required": ["test_dict"],
             },
-            rf"""\{{{WHITESPACE}"test_dict"{WHITESPACE}:{WHITESPACE}\{{{WHITESPACE}({STRING}{WHITESPACE}:{WHITESPACE}{STRING}({WHITESPACE},{WHITESPACE}{STRING}{WHITESPACE}:{WHITESPACE}{STRING}){{0,}})?{WHITESPACE}\}}{WHITESPACE}\}}""",
+            rf"""\{{{SAFE_WHITESPACE}"test_dict"{SAFE_WHITESPACE}:{SAFE_WHITESPACE}\{{{SAFE_WHITESPACE}({STRING}{SAFE_WHITESPACE}:{SAFE_WHITESPACE}{STRING}({SAFE_WHITESPACE},{SAFE_WHITESPACE}{STRING}{SAFE_WHITESPACE}:{SAFE_WHITESPACE}{STRING}){{0,}})?{SAFE_WHITESPACE}\}}{SAFE_WHITESPACE}\}}""",
             [
                 ("""{ "test_dict":{"foo":"bar","baz": "bif"}}""", True),
                 ("""{ "test_dict":{"foo":"bar" }}""", True),
@@ -499,7 +652,7 @@ def test_match_number(pattern, does_match):
                 },
                 "required": ["test_dict"],
             },
-            rf"""\{{{WHITESPACE}"test_dict"{WHITESPACE}:{WHITESPACE}\{{{WHITESPACE}({STRING}{WHITESPACE}:{WHITESPACE}\{{{WHITESPACE}({STRING}{WHITESPACE}:{WHITESPACE}{INTEGER}({WHITESPACE},{WHITESPACE}{STRING}{WHITESPACE}:{WHITESPACE}{INTEGER}){{0,}})?{WHITESPACE}\}}({WHITESPACE},{WHITESPACE}{STRING}{WHITESPACE}:{WHITESPACE}\{{{WHITESPACE}({STRING}{WHITESPACE}:{WHITESPACE}{INTEGER}({WHITESPACE},{WHITESPACE}{STRING}{WHITESPACE}:{WHITESPACE}{INTEGER}){{0,}})?{WHITESPACE}\}}){{0,}})?{WHITESPACE}\}}{WHITESPACE}\}}""",
+            rf"""\{{{SAFE_WHITESPACE}"test_dict"{SAFE_WHITESPACE}:{SAFE_WHITESPACE}\{{{SAFE_WHITESPACE}({STRING}{SAFE_WHITESPACE}:{SAFE_WHITESPACE}\{{{SAFE_WHITESPACE}({STRING}{SAFE_WHITESPACE}:{SAFE_WHITESPACE}{INTEGER}({SAFE_WHITESPACE},{SAFE_WHITESPACE}{STRING}{SAFE_WHITESPACE}:{SAFE_WHITESPACE}{INTEGER}){{0,}})?{SAFE_WHITESPACE}\}}({SAFE_WHITESPACE},{SAFE_WHITESPACE}{STRING}{SAFE_WHITESPACE}:{SAFE_WHITESPACE}\{{{SAFE_WHITESPACE}({STRING}{SAFE_WHITESPACE}:{SAFE_WHITESPACE}{INTEGER}({SAFE_WHITESPACE},{SAFE_WHITESPACE}{STRING}{SAFE_WHITESPACE}:{SAFE_WHITESPACE}{INTEGER}){{0,}})?{SAFE_WHITESPACE}\}}){{0,}})?{SAFE_WHITESPACE}\}}{SAFE_WHITESPACE}\}}""",
             [
                 (
                     """{"test_dict": {"foo": {"bar": 123, "apple": 99}, "baz": {"bif": 456}}}""",
@@ -559,7 +712,7 @@ def test_match_number(pattern, does_match):
                 "title": "Foo",
                 "prefixItems": [{"type": "string"}, {"type": "integer"}],
             },
-            rf"\[{WHITESPACE}{STRING}{WHITESPACE},{WHITESPACE}{INTEGER}{WHITESPACE}\]",
+            rf"\[{SAFE_WHITESPACE}{STRING}{SAFE_WHITESPACE},{SAFE_WHITESPACE}{INTEGER}{SAFE_WHITESPACE}\]",
             [('["a", 1]', True), ('["a", 1, 1]', False), ("[]", False)],
         ),
         # Nested schema
@@ -751,7 +904,9 @@ def test_match_number(pattern, does_match):
 def test_match(schema, regex, examples):
     interegular.parse_pattern(regex)
     schema = json.dumps(schema)
-    test_regex = build_regex_from_schema(schema)
+    test_regex = build_regex_from_schema(
+        schema, whitespace_pattern=SAFE_WHITESPACE, safe_subset=False
+    )
     assert test_regex == regex
 
     for string, does_match in examples:
@@ -1000,10 +1155,10 @@ def test_json_schema_custom_whitespace_pattern(whitespace_pattern):
 
     # assert any ws pattern can be used
     if whitespace_pattern == "abc":
-        build_regex_from_schema(schema, whitespace_pattern)
+        build_regex_from_schema(schema, whitespace_pattern, safe_subset=False)
         return
 
-    pattern = build_regex_from_schema(schema, whitespace_pattern)
+    pattern = build_regex_from_schema(schema, whitespace_pattern, safe_subset=False)
 
     mock_result_mult_ws = (
         """{     "foo"   :   4, \n\n\n   "bar": "baz    baz baz bar"\n\n}"""

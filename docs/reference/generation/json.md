@@ -34,13 +34,20 @@ print(result)
 # User(name="John", last_name="Doe", id=11)
 ```
 
-!!! Note "JSON and whitespaces"
+!!! Note "JSON and unlimited patterns"
 
-    By default Outlines prevents the model from generating json with syntactic newlines, tabs, or multiple spaces. The default `whitespace_pattern` is `r"[ ]?"`. Small models tend to enter an infinite repetition loop if the `whitespace_pattern` allows infinite spacing. If you would like to allow the model to generate multiple tabs, newlines, and spaces, you can set the whitespace pattern as follows:
+    By default Outlines prevents the model from generating json with syntactic newlines, tabs, or multiple spaces. Additionally by default strings cannot be longer than 256 characters, and integers are bound between -1e19 and 1e19. Small models tend to enter an infinite repetition loop if JSON schema generation isn't constrained. If you would like to allow the model to generate multiple tabs, newlines, and spaces, you can set the whitespace pattern as follows:
 
     ```python
     generator = generate.json(model, User, whitespace_pattern=r"[\n\t ]*")
     ```
+
+	Or you can remove all implicit constraints on json generation (whitespace, integer, and string) with
+
+    ```python
+    generator = generate.json(model, User, safe_subset=False)
+    ```
+
 
 !!! Note "Performance"
 
