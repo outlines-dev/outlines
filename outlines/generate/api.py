@@ -126,14 +126,15 @@ class SequenceGenerator:
 
         """
         return sequence
-
+    
     def __call__(
-        self,
-        prompts: Union[str, List[str]],
-        max_tokens: Optional[int] = None,
-        stop_at: Optional[Union[str, List[str]]] = None,
-        rng: Optional["torch.Generator"] = None,
-    ) -> Union[FormattedOutput, List[FormattedOutput], List[List[FormattedOutput]]]:
+            self,
+            prompts: Optional[Union[str, List[str]]],
+            max_tokens: Optional[int] = None,
+            stop_at: Optional[Union[str, List[str]]] = None,
+            rng: Optional["torch.Generator"] = None,
+            include_prompt: bool = False,
+        ) -> Union[FormattedOutput, List[FormattedOutput], List[List[FormattedOutput]]]:
         """Generate the full text sequence.
 
         Since `SequenceGenerator.stream` calls the tokenizer at every step this
@@ -154,6 +155,10 @@ class SequenceGenerator:
         rng
             The random number generator. Defaults to a non-seeded `torch.Generator`
             instance.
+        include prompt
+            Whether the prompt itself should be included in the generation pattern. Also
+            has the effect of the prompt being in the output. Useful if the input is
+            the start of a json dict, for example, and you want to generate the rest.
 
         Returns
         -------
@@ -175,6 +180,7 @@ class SequenceGenerator:
             rng.seed()
 
         prompt_token_ids, attention_masks = self.tokenizer.encode(prompts)
+
         prompt_token_ids = prompt_token_ids.to(self.device)
         attention_masks = attention_masks.to(self.device)
 
@@ -191,6 +197,22 @@ class SequenceGenerator:
         weights = torch.zeros(
             (batch_size * num_samples), dtype=torch.float, device=self.device
         )
+
+        if include_prompt:
+            final_fsm_states = []
+            for fsm, state, prompt_token_id_seq, attention_mask_seq in mit.zip_equal(
+                fsms, fsm_states, prompt_token_ids, attention_masks):
+                assert state == 0, f"Expected state to be 0, got {state}"
+                assert isinstance(state, int), f"Expected state to be an int, got {state}"
+                for token_id, attention_mask in zip(prompt_token_id_seq, attention_mask_seq):
+                    state = fsm.get_next_state(state=state, token_id=token_id.item())
+                    if state < 0:
+                        raise ValueError(f"Invalid state {state}")
+                final_fsm_states.append(state)
+
+            start_len = len(fsm_states)
+            fsm_states = final_fsm_states
+            assert len(fsm_states) == start_len, f"{len(fsm_states) = }, {start_len = }"
 
         states = sequence_generator(
             self.model,
@@ -211,8 +233,10 @@ class SequenceGenerator:
                     generated_token_ids = self.get_generated_token_ids(
                         prompt_token_ids, token_ids
                     )
+
                     if max_tokens and len(generated_token_ids[0]) >= max_tokens:
                         break
+                    
                     if stop_sequences and self.is_stop_sequence_found(
                         self.tokenizer.decode(generated_token_ids), stop_sequences
                     ):
@@ -221,7 +245,14 @@ class SequenceGenerator:
                 break
 
         token_ids = last_state.token_ids
-        generated_token_ids = self.get_generated_token_ids(prompt_token_ids, token_ids)
+        
+
+        # The generated token ids are the same as the token ids if we include the prompt.
+        # To retain the ability to parse to json, we need to keep the prompt token ids.        
+        if include_prompt:
+            generated_token_ids = token_ids
+        else:
+            generated_token_ids = self.get_generated_token_ids(prompt_token_ids, token_ids)
 
         generated = self.tokenizer.decode(generated_token_ids)
         stripped = [
@@ -244,6 +275,7 @@ class SequenceGenerator:
             return [samples[0] for samples in output]
         else:
             return output
+
 
     def stream(
         self,
