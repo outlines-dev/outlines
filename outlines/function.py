@@ -3,12 +3,37 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional, Tuple, Union
 
 import requests
+from pydantic import RootModel
 
 from outlines import generate, models
 
 if TYPE_CHECKING:
     from outlines.generate.api import SequenceGenerator
     from outlines.prompts import Prompt
+
+
+class NewFunction:
+    """Represents an Outlines function.
+
+    Functions are a convenient way to encapsulate a prompt template, a language
+    model and a Pydantic model that define the output structure. Once defined,
+    the function can be called with arguments that will be used to render the
+    prompt template.
+
+    """
+
+    model: str
+    prompt_template: Optional[Callable] = None
+    pydantic_schema: Optional[RootModel] = None
+
+    def prompt(self, fn: Callable):
+        pass
+
+    def schema(self, model: RootModel):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        pass
 
 
 @dataclass
