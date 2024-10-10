@@ -40,7 +40,7 @@ dependencies = [
    "typing_extensions",
    "pycountry",
    "airportsdata",
-   "outlines_core==0.1.0",
+   "outlines_core>=0.1.13",
 ]
 dynamic = ["version"]
 
