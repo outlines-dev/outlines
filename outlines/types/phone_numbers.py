@@ -14,3 +14,11 @@ USPhoneNumber = Annotated[
     str,
     WithJsonSchema({"type": "string", "pattern": US_PHONE_NUMBER}),
 ]
+
+# Phone numbers in Egypt.
+EGYPT_PHONE_NUMBER = r"^01[0-2,5]{1}[0-9]{8}$"
+
+EgpytPhoneNumber = Annotated[
+    str, 
+    WithJsonSchema({"type": "string", "pattern": EGYPT_PHONE_NUMBER}),
+]
